@@ -48,6 +48,14 @@ export async function setOverlayExpanded(expanded: boolean): Promise<void> {
   await invoke("set_overlay_expanded", { expanded });
 }
 
+export async function setOverlayHeight(height: number): Promise<void> {
+  await invoke("set_overlay_height", { height });
+}
+
 export async function hideOverlay(): Promise<void> {
   await getCurrentWindow().hide();
+}
+
+export async function startOverlayDragging(): Promise<void> {
+  await getCurrentWindow().startDragging();
 }

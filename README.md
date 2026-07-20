@@ -20,7 +20,8 @@ claims to know an exact number of tokens left.
 ## Requirements
 
 - Windows 10 or Windows 11, x64
-- An installed `codex.exe` available on PATH, or its path selected in the app
+- An installed Codex CLI. The app checks PATH, common user install folders, and
+  VS Code/Cursor extension installs, or its path can be selected in the app
 - A ChatGPT account signed into Codex
 - Node.js 20 or newer and Rust 1.77.2 or newer to build from source
 
@@ -37,6 +38,22 @@ command to terminate the overlay and its private app-server child process.
 
 On first launch, Start with Windows is enabled. It can be disabled from the
 expanded overlay or tray menu.
+
+### Build the Windows executable
+
+```powershell
+npm.cmd run build:exe
+```
+
+This runs the test suite, builds the release app, creates the NSIS installer,
+and copies both outputs into `artifacts\`:
+
+- `Codex Usage Overlay.exe` — standalone release executable
+- `Codex Usage Overlay_<version>_x64-setup.exe` — Windows installer
+
+Use `powershell -NoProfile -ExecutionPolicy Bypass -File
+scripts\build-executable.ps1 -SkipTests` when rebuilding after tests have
+already passed.
 
 ## Verification
 
@@ -69,12 +86,15 @@ Codex version against which the protocol was last reviewed.
 
 ## Troubleshooting
 
-- **Codex CLI not found:** Expand the overlay and choose the installed
-  `codex.exe`, or put Codex on PATH and select **Use Codex from PATH**.
+- **Codex CLI not found:** The app checks PATH, `%USERPROFILE%\.vscode\extensions`,
+  VS Code Insiders/Cursor extension folders, and common Codex/OpenAI install
+  folders. If Codex was installed after the app started, use **Use Codex from
+  PATH** to retry or choose the installed `codex.exe` directly.
 - **Sign-in required:** Select **Sign in with Codex**. Authentication remains
   managed by Codex in the system browser.
 - **Reconnecting:** The last in-memory snapshot remains visible and marked stale.
   Use **Refresh now** after network access returns.
-- **No 5-hour row:** Allowance windows are account-dependent. The app renders only
-  windows actually returned by Codex instead of assuming both 5-hour and weekly
-  limits always exist.
+- **No 5-hour row:** The app maps Codex's primary rate-limit window to the
+  five-hour tracker, including responses where the server omits the duration
+  metadata. If primary is absent entirely, Codex has not provided a valid
+  five-hour percentage to display.

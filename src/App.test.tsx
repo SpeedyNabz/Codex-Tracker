@@ -70,13 +70,15 @@ function props(state: AppState) {
     onUsePath: vi.fn(),
     onAutostart: vi.fn(),
     onExpanded: vi.fn(),
+    onDrag: vi.fn(),
     onHide: vi.fn(),
   };
 }
 
 describe("Overlay", () => {
   it("renders all available main allowance windows in compact mode", () => {
-    render(<Overlay {...props(readyState())} />);
+    const handlers = props(readyState());
+    render(<Overlay {...handlers} />);
 
     expect(screen.getByText("5-hour allowance")).toBeInTheDocument();
     expect(screen.getByText("72% remaining")).toBeInTheDocument();
@@ -87,6 +89,18 @@ describe("Overlay", () => {
       "aria-expanded",
       "false",
     );
+
+    fireEvent.pointerDown(screen.getByRole("heading", { name: "Codex Usage" }), {
+      button: 0,
+    });
+    expect(handlers.onDrag).toHaveBeenCalledOnce();
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Hide overlay" }), {
+      button: 0,
+    });
+    expect(handlers.onDrag).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Hide overlay" }));
+    expect(handlers.onHide).toHaveBeenCalledOnce();
   });
 
   it("shows exact token activity, credits, and settings only when expanded", () => {

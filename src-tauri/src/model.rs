@@ -202,7 +202,7 @@ fn normalize_window(key: &str, value: &Value) -> QuotaWindow {
 
     QuotaWindow {
         key: key.to_string(),
-        label: duration_label(duration),
+        label: duration_label(key, duration),
         used_percent: used,
         remaining_percent: (100.0 - used).clamp(0.0, 100.0),
         window_duration_mins: duration,
@@ -210,13 +210,15 @@ fn normalize_window(key: &str, value: &Value) -> QuotaWindow {
     }
 }
 
-fn duration_label(duration: Option<i64>) -> String {
+fn duration_label(key: &str, duration: Option<i64>) -> String {
     match duration {
         Some(300) => "5-hour allowance".to_string(),
         Some(10_080) => "Weekly allowance".to_string(),
         Some(minutes) if minutes > 0 && minutes % 1_440 == 0 => unit_label(minutes / 1_440, "day"),
         Some(minutes) if minutes > 0 && minutes % 60 == 0 => unit_label(minutes / 60, "hour"),
         Some(minutes) if minutes > 0 => unit_label(minutes, "minute"),
+        None if key.eq_ignore_ascii_case("primary") => "5-hour allowance".to_string(),
+        None if key.eq_ignore_ascii_case("secondary") => "Weekly allowance".to_string(),
         _ => "Allowance".to_string(),
     }
 }
@@ -406,5 +408,21 @@ mod tests {
         );
         assert_eq!(snapshot.token_activity.today_tokens.as_deref(), Some("0"));
         assert!(snapshot.credits.unwrap().individual_limit.is_some());
+    }
+
+    #[test]
+    fn labels_primary_and_secondary_windows_when_duration_metadata_is_missing() {
+        let limits = json!({
+            "rateLimits": {
+                "limitId": "codex",
+                "primary": { "usedPercent": 25, "windowDurationMins": null, "resetsAt": 1000 },
+                "secondary": { "usedPercent": 10, "windowDurationMins": null, "resetsAt": 2000 }
+            }
+        });
+
+        let snapshot = normalize_snapshot(&limits, None, "2026-07-20", 100).unwrap();
+        let windows = &snapshot.quota_groups[0].windows;
+        assert_eq!(windows[0].label, "5-hour allowance");
+        assert_eq!(windows[1].label, "Weekly allowance");
     }
 }

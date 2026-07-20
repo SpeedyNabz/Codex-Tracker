@@ -70,6 +70,7 @@ pub fn run() {
             runtime::set_codex_executable,
             runtime::set_autostart_enabled,
             runtime::set_overlay_expanded,
+            runtime::set_overlay_height,
         ])
         .build(tauri::generate_context!())
         .expect("error while building Codex Usage Overlay");

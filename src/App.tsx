@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   beginChatgptLogin,
   chooseCodexExecutable,
@@ -8,6 +8,8 @@ import {
   refreshUsage,
   setAutostartEnabled,
   setOverlayExpanded,
+  setOverlayHeight,
+  startOverlayDragging,
   useCodexFromPath,
 } from "./api";
 import type { AppState, QuotaGroup, QuotaWindow } from "./types";
@@ -24,6 +26,7 @@ interface OverlayProps {
   onUsePath: () => void;
   onAutostart: (enabled: boolean) => void;
   onExpanded: (expanded: boolean) => void;
+  onDrag: () => void;
   onHide: () => void;
 }
 
@@ -58,6 +61,18 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (state.expanded) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const height = measureCompactOverlayHeight();
+      if (height !== null) {
+        void setOverlayHeight(height).catch(() => undefined);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [actionError, state.expanded, state.message, state.snapshot?.updatedAt, state.status]);
+
   const run = (action: () => Promise<void>) => {
     setActionError(null);
     void action().catch((error) => setActionError(errorMessage(error)));
@@ -74,6 +89,7 @@ export default function App() {
       onUsePath={() => run(useCodexFromPath)}
       onAutostart={(enabled) => run(() => setAutostartEnabled(enabled))}
       onExpanded={(expanded) => run(() => setOverlayExpanded(expanded))}
+      onDrag={() => run(startOverlayDragging)}
       onHide={() => run(hideOverlay)}
     />
   );
@@ -89,6 +105,7 @@ export function Overlay({
   onUsePath,
   onAutostart,
   onExpanded,
+  onDrag,
   onHide,
 }: OverlayProps) {
   const mainGroups = state.snapshot?.quotaGroups.filter((group) => group.primary) ?? [];
@@ -99,15 +116,20 @@ export function Overlay({
   return (
     <main className={`overlay-shell ${state.snapshot?.stale ? "is-stale" : ""}`}>
       <section className="overlay-card" aria-label="Codex usage overlay">
-        <header className="titlebar" data-tauri-drag-region>
-          <div className="brand" data-tauri-drag-region>
+        <header
+          className="titlebar"
+          onPointerDown={(event) => {
+            if (event.button === 0) onDrag();
+          }}
+        >
+          <div className="brand">
             <span className={`status-dot status-${state.status}`} aria-hidden="true" />
-            <div data-tauri-drag-region>
-              <h1 data-tauri-drag-region>Codex Usage</h1>
-              <p data-tauri-drag-region>{statusLabel}</p>
+            <div>
+              <h1>Codex Usage</h1>
+              <p>{statusLabel}</p>
             </div>
           </div>
-          <div className="window-actions">
+          <div className="window-actions" onPointerDown={(event) => event.stopPropagation()}>
             <button
               className={`icon-button ${state.updating ? "is-spinning" : ""}`}
               type="button"
@@ -205,6 +227,24 @@ function QuotaGroupView({ group, now }: { group: QuotaGroup; now: number }) {
       ))}
     </section>
   );
+}
+
+function measureCompactOverlayHeight(): number | null {
+  const card = document.querySelector<HTMLElement>(".overlay-card");
+  const content = document.querySelector<HTMLElement>(".content");
+  if (!card || !content) return null;
+
+  const previousCardHeight = card.style.height;
+  const previousContentFlex = content.style.flex;
+  const previousContentOverflow = content.style.overflow;
+  card.style.height = "auto";
+  content.style.flex = "none";
+  content.style.overflow = "visible";
+  const height = Math.ceil(card.getBoundingClientRect().height + 8);
+  card.style.height = previousCardHeight;
+  content.style.flex = previousContentFlex;
+  content.style.overflow = previousContentOverflow;
+  return height;
 }
 
 function QuotaMeter({ window, now }: { window: QuotaWindow; now: number }) {

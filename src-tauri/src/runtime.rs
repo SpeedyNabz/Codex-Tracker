@@ -6,6 +6,8 @@ use crate::{
 use chrono::Local;
 use serde::Serialize;
 use serde_json::{json, Value};
+#[cfg(windows)]
+use std::fs;
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
@@ -23,9 +25,10 @@ use tokio::{
     time::{sleep, timeout, MissedTickBehavior},
 };
 
-const COMPACT_WIDTH: f64 = 340.0;
-const COMPACT_HEIGHT: f64 = 260.0;
-const EXPANDED_HEIGHT: f64 = 610.0;
+const COMPACT_WIDTH: f64 = 300.0;
+const COMPACT_HEIGHT: f64 = 188.0;
+const MIN_COMPACT_HEIGHT: f64 = 120.0;
+const EXPANDED_HEIGHT: f64 = 520.0;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,7 +86,7 @@ impl AppRuntime {
                     self.update_state(|state| {
                         state.status = ConnectionStatus::NeedsCodex;
                         state.message = Some(
-                            "Install Codex or choose the installed codex.exe to begin.".to_string(),
+                            "Codex CLI not found. Checked PATH and common install locations; choose codex.exe to continue.".to_string(),
                         );
                         state.codex_path = None;
                         state.codex_version = None;
@@ -420,6 +423,20 @@ impl AppRuntime {
         Ok(())
     }
 
+    pub async fn set_overlay_height(&self, height: f64) -> Result<(), String> {
+        if !height.is_finite() {
+            return Err("Overlay height must be finite".to_string());
+        }
+        let window = self
+            .app
+            .get_webview_window("main")
+            .ok_or_else(|| "Overlay window is unavailable".to_string())?;
+        let height = height.clamp(MIN_COMPACT_HEIGHT, EXPANDED_HEIGHT);
+        window
+            .set_size(LogicalSize::new(COMPACT_WIDTH, height))
+            .map_err(|error| format!("Could not resize overlay: {error}"))
+    }
+
     pub async fn record_window_position(&self, x: i32, y: i32) {
         let mut settings = self.settings.lock().expect("settings lock poisoned");
         settings.window_x = Some(x);
@@ -446,34 +463,29 @@ impl AppRuntime {
             .expect("settings lock poisoned")
             .codex_executable
             .clone();
-        if let Some(path) = configured.map(PathBuf::from).filter(|path| path.is_file()) {
-            return Some(path);
+
+        let mut candidates = Vec::new();
+        if let Some(path) = configured {
+            push_unique_path(&mut candidates, PathBuf::from(path));
         }
 
         #[cfg(windows)]
         {
-            let output = Command::new("where.exe")
-                .arg("codex.exe")
-                .stdin(Stdio::null())
-                .stderr(Stdio::null())
-                .output()
-                .await
-                .ok()?;
-            if output.status.success() {
-                return String::from_utf8_lossy(&output.stdout)
-                    .lines()
-                    .map(str::trim)
-                    .filter(|line| !line.is_empty())
-                    .map(PathBuf::from)
-                    .find(|path| path.is_file());
+            candidates.extend(windows_codex_candidates().await);
+
+            for candidate in candidates {
+                if candidate.is_file() && codex_version(&candidate).await.is_ok() {
+                    return Some(candidate);
+                }
             }
+
+            None
         }
 
         #[cfg(not(windows))]
         {
-            return Some(PathBuf::from("codex"));
+            Some(PathBuf::from("codex"))
         }
-        None
     }
 
     async fn connection_failure(&self, error: &str) {
@@ -502,6 +514,155 @@ impl AppRuntime {
         };
         let _ = self.app.emit("usage-state-changed", snapshot);
     }
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    let normalized = path.to_string_lossy().to_ascii_lowercase();
+    if !paths
+        .iter()
+        .any(|existing| existing.to_string_lossy().to_ascii_lowercase() == normalized)
+    {
+        paths.push(path);
+    }
+}
+
+#[cfg(windows)]
+async fn windows_codex_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    // This is the cheapest and most intentional lookup, but an autostarted app
+    // can inherit a PATH that predates a Codex or VS Code installation.
+    if let Ok(output) = Command::new("where.exe")
+        .arg("codex.exe")
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .await
+    {
+        if output.status.success() {
+            for line in String::from_utf8_lossy(&output.stdout).lines() {
+                let path = line.trim().trim_matches('"');
+                if !path.is_empty() {
+                    push_unique_path(&mut candidates, PathBuf::from(path));
+                }
+            }
+        }
+    }
+
+    // Also inspect PATH entries directly so a non-standard `where.exe` result
+    // or a quoted PATH entry cannot hide the executable.
+    if let Some(path) = std::env::var_os("PATH") {
+        for directory in std::env::split_paths(&path) {
+            push_unique_path(&mut candidates, directory.join("codex.exe"));
+        }
+    }
+
+    for root in windows_codex_search_roots() {
+        for path in find_codex_executables(&root, 4) {
+            push_unique_path(&mut candidates, path);
+        }
+    }
+
+    candidates
+}
+
+#[cfg(windows)]
+fn windows_codex_search_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+
+    if let Some(profile) = std::env::var_os("USERPROFILE") {
+        let profile = PathBuf::from(profile);
+        roots.extend([
+            profile.join(".vscode\\extensions"),
+            profile.join(".vscode-insiders\\extensions"),
+            profile.join(".cursor\\extensions"),
+            profile.join(".local\\bin"),
+        ]);
+    }
+
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        let app_data = PathBuf::from(app_data);
+        roots.extend([
+            app_data.join("npm"),
+            app_data.join("Code\\User\\extensions"),
+            app_data.join("Code - Insiders\\User\\extensions"),
+            app_data.join("VSCodium\\User\\extensions"),
+        ]);
+    }
+
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let local_app_data = PathBuf::from(local_app_data);
+        roots.extend([
+            local_app_data.join("Programs\\Codex"),
+            local_app_data.join("Programs\\OpenAI"),
+            local_app_data.join("OpenAI"),
+            local_app_data.join("Microsoft\\WinGet\\Packages"),
+        ]);
+    }
+
+    if let Some(program_files) = std::env::var_os("ProgramFiles") {
+        let program_files = PathBuf::from(program_files);
+        roots.extend([
+            program_files.join("Codex"),
+            program_files.join("OpenAI"),
+        ]);
+    }
+
+    if let Ok(executable) = std::env::current_exe() {
+        if let Some(directory) = executable.parent() {
+            roots.push(directory.to_path_buf());
+        }
+    }
+
+    roots
+}
+
+#[cfg(windows)]
+fn find_codex_executables(root: &Path, max_depth: usize) -> Vec<PathBuf> {
+    fn visit(
+        directory: &Path,
+        depth: usize,
+        max_depth: usize,
+        results: &mut Vec<PathBuf>,
+    ) {
+        let Ok(entries) = fs::read_dir(directory) else {
+            return;
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_file()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.eq_ignore_ascii_case("codex.exe"))
+            {
+                results.push(path);
+            } else if file_type.is_dir() && depth < max_depth {
+                visit(&path, depth + 1, max_depth, results);
+            }
+        }
+    }
+
+    let mut results = Vec::new();
+    if root.is_dir() {
+        visit(root, 0, max_depth, &mut results);
+    } else if is_codex_executable(root) {
+        results.push(root.to_path_buf());
+    }
+    results
+}
+
+#[cfg(windows)]
+fn is_codex_executable(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("codex.exe"))
 }
 
 fn mark_snapshot_stale(state: &mut AppStateDto) {
@@ -606,6 +767,14 @@ pub async fn set_overlay_expanded(
     runtime.set_expanded(expanded).await
 }
 
+#[tauri::command]
+pub async fn set_overlay_height(
+    runtime: State<'_, Arc<AppRuntime>>,
+    height: f64,
+) -> Result<(), String> {
+    runtime.set_overlay_height(height).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -630,5 +799,31 @@ mod tests {
         let public = public_error(&error);
         assert!(!public.contains("example.test"));
         assert!(public.chars().count() <= 240);
+    }
+
+    #[test]
+    fn unique_paths_are_case_insensitive() {
+        let mut paths = Vec::new();
+        push_unique_path(&mut paths, PathBuf::from(r"C:\Users\Test\codex.exe"));
+        push_unique_path(&mut paths, PathBuf::from(r"c:\users\test\CODEX.EXE"));
+        assert_eq!(paths.len(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn finds_codex_inside_an_extension_install() {
+        let root = tempfile::tempdir().expect("temporary directory");
+        let executable = root
+            .path()
+            .join("openai.chatgpt-26.715.31925-win32-x64")
+            .join("bin")
+            .join("windows-x86_64")
+            .join("codex.exe");
+        std::fs::create_dir_all(executable.parent().expect("executable parent"))
+            .expect("extension directories");
+        std::fs::File::create(&executable).expect("codex executable");
+
+        let found = find_codex_executables(root.path(), 4);
+        assert_eq!(found, vec![executable]);
     }
 }

@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "tauri": "tauri",
+    "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-executable.ps1",
     "protocol:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-codex-protocol.ps1",
     "test:live-codex": "node scripts/live-codex-smoke.mjs"
   },
