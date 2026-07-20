@@ -80,6 +80,7 @@ describe("Overlay", () => {
     const handlers = props(readyState());
     render(<Overlay {...handlers} />);
 
+    expect(screen.getByText("just now")).toBeInTheDocument();
     expect(screen.getByText("5-hour allowance")).toBeInTheDocument();
     expect(screen.getByText("72% remaining")).toBeInTheDocument();
     expect(screen.getByText("Weekly allowance")).toBeInTheDocument();
@@ -101,6 +102,16 @@ describe("Overlay", () => {
     expect(handlers.onDrag).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "Hide overlay" }));
     expect(handlers.onHide).toHaveBeenCalledOnce();
+  });
+
+  it("shows the elapsed time since the last refresh next to the refresh control", () => {
+    const state = readyState({
+      snapshot: { ...readyState().snapshot!, updatedAt: now / 1_000 - 42 },
+    });
+    render(<Overlay {...props(state)} />);
+
+    expect(screen.getByText("42s ago")).toBeInTheDocument();
+    expect(screen.getByLabelText("Last refreshed 42s ago")).toBeInTheDocument();
   });
 
   it("shows exact token activity, credits, and settings only when expanded", () => {

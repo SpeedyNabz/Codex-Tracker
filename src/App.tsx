@@ -130,16 +130,33 @@ export function Overlay({
             </div>
           </div>
           <div className="window-actions" onPointerDown={(event) => event.stopPropagation()}>
-            <button
-              className={`icon-button ${state.updating ? "is-spinning" : ""}`}
-              type="button"
-              aria-label="Refresh usage"
-              title="Refresh now"
-              disabled={state.updating || state.status === "needsCodex"}
-              onClick={onRefresh}
-            >
-              <RefreshIcon />
-            </button>
+            <div className="refresh-control">
+              <button
+                className={`icon-button ${state.updating ? "is-spinning" : ""}`}
+                type="button"
+                aria-label="Refresh usage"
+                title="Refresh now"
+                disabled={state.updating || state.status === "needsCodex"}
+                onClick={onRefresh}
+              >
+                <RefreshIcon />
+              </button>
+              <span
+                className="refresh-age"
+                aria-label={
+                  state.snapshot
+                    ? `Last refreshed ${formatUpdatedAt(state.snapshot.updatedAt, now)}`
+                    : "No refresh completed yet"
+                }
+                title={
+                  state.snapshot
+                    ? `Last refreshed ${formatUpdatedAt(state.snapshot.updatedAt, now)}`
+                    : "No refresh completed yet"
+                }
+              >
+                {state.snapshot ? formatUpdatedAt(state.snapshot.updatedAt, now) : "Not yet"}
+              </span>
+            </div>
             <button
               className="icon-button"
               type="button"

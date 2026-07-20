@@ -143,6 +143,21 @@ button {
   cursor: default;
 }
 
+.refresh-control {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.refresh-age {
+  min-width: 31px;
+  color: var(--text-subtle);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .icon-button {
   display: grid;
   width: 23px;

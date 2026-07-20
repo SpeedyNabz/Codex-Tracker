@@ -7,7 +7,7 @@ use runtime::AppRuntime;
 use std::sync::Arc;
 use tauri::{
     menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, PhysicalPosition, WebviewWindow, WindowEvent,
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
@@ -109,6 +109,15 @@ fn setup_tray(
         .tooltip("Codex Usage Overlay")
         .menu(&menu)
         .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_overlay(tray.app_handle(), true);
+            }
+        })
         .on_menu_event(move |app, event| {
             let runtime = app.state::<Arc<AppRuntime>>().inner().clone();
             match event.id().as_ref() {
