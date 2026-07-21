@@ -349,6 +349,16 @@ button {
   background: linear-gradient(90deg, var(--tone-danger), var(--accent-alt));
 }
 
+.meter-heading strong.tone-healthy,
+.meter-heading strong.tone-warning,
+.meter-heading strong.tone-danger {
+  background: linear-gradient(90deg, var(--accent), var(--accent-alt));
+  background-clip: text;
+  color: transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 .quota-meter p {
   margin: 3px 0 0;
   color: var(--text-subtle);

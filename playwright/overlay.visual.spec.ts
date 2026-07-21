@@ -113,6 +113,7 @@ test.describe("overlay appearance", () => {
       await expect(page.getByRole("button", { name: "Open HeavyMask website" })).toBeVisible();
 
       const themeBarBackgrounds = new Set<string>();
+      const themePercentageText = new Set<string>();
       for (const theme of ["HeavyMask", "Ocean", "Orchid", "Ember", "Forest"]) {
         await page.getByRole("button", { name: `Select ${theme} theme` }).click();
         await expect(shell).toHaveClass(new RegExp(`palette-${theme.toLowerCase()}`));
@@ -122,6 +123,12 @@ test.describe("overlay appearance", () => {
         });
         expect(barStyle.backgroundImage).toContain("linear-gradient");
         themeBarBackgrounds.add(`${barStyle.backgroundImage}|${barStyle.color}`);
+        const percentageTextStyle = await page.locator(".meter-heading strong").first().evaluate((element) => {
+          const computed = getComputedStyle(element);
+          return `${computed.backgroundImage}|${computed.webkitTextFillColor}`;
+        });
+        expect(percentageTextStyle).toContain("linear-gradient");
+        themePercentageText.add(percentageTextStyle);
 
         if (theme === "HeavyMask") {
           const heavyMaskColors = await shell.evaluate((element) => {
@@ -138,6 +145,7 @@ test.describe("overlay appearance", () => {
         }
       }
       expect(themeBarBackgrounds.size).toBe(5);
+      expect(themePercentageText.size).toBe(5);
 
       await page.getByRole("button", { name: "Select HeavyMask theme" }).click();
       await expect(shell).toHaveClass(/palette-heavymask/);
