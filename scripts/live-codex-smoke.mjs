@@ -74,7 +74,7 @@ send({
   params: {
     clientInfo: {
       name: "codex_usage_overlay_smoke",
-      title: "Codex Usage Overlay Smoke",
+      title: "Codex Tracker Smoke",
       version: "0.1.0",
     },
     capabilities: { experimentalApi: false, requestAttestation: false },

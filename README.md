@@ -1,4 +1,6 @@
-# Codex Usage Overlay
+# Codex Tracker by HeavyMask
+
+Made by [HeavyMask](https://heavymask.com).
 
 A lightweight Windows overlay for live Codex allowance percentages, reset times,
 daily and lifetime token activity, and additional credits. It uses the installed
@@ -48,8 +50,8 @@ npm.cmd run build:exe
 This runs the test suite, builds the release app, creates the NSIS installer,
 and copies both outputs into `artifacts\`:
 
-- `Codex Usage Overlay.exe` — standalone release executable
-- `Codex Usage Overlay_<version>_x64-setup.exe` — Windows installer
+- `Codex Tracker.exe` — standalone release executable
+- `Codex Tracker_<version>_x64-setup.exe` — Windows installer
 
 Use `powershell -NoProfile -ExecutionPolicy Bypass -File
 scripts\build-executable.ps1 -SkipTests` when rebuilding after tests have

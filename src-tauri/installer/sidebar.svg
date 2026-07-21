@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="164" height="314" viewBox="0 0 164 314">
+  <rect width="164" height="314" fill="#D8FEF5"/>
+  <circle cx="151" cy="32" r="48" fill="#53E4C6" opacity=".28"/>
+  <circle cx="10" cy="288" r="64" fill="#FCEC4F" opacity=".3"/>
+  <image x="36" y="16" width="92" height="134" preserveAspectRatio="xMidYMid meet" href="__SAMMY_ASSET__"/>
+  <text x="22" y="171" fill="#212121" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Codex Tracker</text>
+  <text x="22" y="189" fill="#087F6B" font-family="Segoe UI, Arial, sans-serif" font-size="9" font-weight="700" letter-spacing="1.3">BY HEAVYMASK</text>
+  <rect x="22" y="205" width="120" height="1" fill="#10D9B0"/>
+  <text x="22" y="228" fill="#212121" opacity=".74" font-family="Segoe UI, Arial, sans-serif" font-size="9">Live allowance tracking</text>
+  <text x="22" y="244" fill="#212121" opacity=".58" font-family="Segoe UI, Arial, sans-serif" font-size="8">Focused, calm, and local.</text>
+  <text x="22" y="291" fill="#087F6B" font-family="Segoe UI, Arial, sans-serif" font-size="8">heavymask.com</text>
+</svg>

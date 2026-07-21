@@ -1,6 +1,7 @@
 node_modules/
 dist/
 artifacts/
+test-results/
 src-tauri/target/
 src/codex-protocol/
 *.log

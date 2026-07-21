@@ -1,38 +1,68 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   beginChatgptLogin,
   chooseCodexExecutable,
+  dismissCheckpointNotification,
   getAppState,
   hideOverlay,
+  openHeavyMaskSite,
   onAppState,
   refreshUsage,
   setAutostartEnabled,
+  setCheckpointPercentages,
   setOverlayExpanded,
   setOverlayHeight,
+  setRefreshInterval,
   startOverlayDragging,
   useCodexFromPath,
 } from "./api";
 import type { AppState, QuotaGroup, QuotaWindow } from "./types";
 import { initialState } from "./types";
+import sammyLogo from "./assets/heavymask-sammy.svg";
 import "./styles.css";
+
+export type Theme = "dark" | "light";
+export type Palette = "heavymask" | "ocean" | "orchid" | "ember" | "forest";
+
+const THEME_STORAGE_KEY = "codex-usage-overlay-theme";
+const PALETTE_STORAGE_KEY = "codex-usage-overlay-palette";
+
+export const PALETTE_OPTIONS: Array<{ id: Palette; label: string; description: string }> = [
+  { id: "heavymask", label: "HeavyMask", description: "Yellow" },
+  { id: "ocean", label: "Ocean", description: "Blue + aqua" },
+  { id: "orchid", label: "Orchid", description: "Violet + pink" },
+  { id: "ember", label: "Ember", description: "Amber + coral" },
+  { id: "forest", label: "Forest", description: "Mint + green" },
+];
 
 interface OverlayProps {
   state: AppState;
   now: number;
+  theme: Theme;
+  palette: Palette;
   actionError?: string | null;
   onRefresh: () => void;
   onLogin: () => void;
   onChooseCodex: () => void;
   onUsePath: () => void;
   onAutostart: (enabled: boolean) => void;
+  onRefreshInterval: (seconds: number) => void;
+  onCheckpointPercentages: (percentages: number[]) => void;
+  onDismissCheckpointNotification: () => void;
   onExpanded: (expanded: boolean) => void;
   onDrag: () => void;
   onHide: () => void;
+  onToggleTheme: () => void;
+  onPaletteChange: (palette: Palette) => void;
+  onOpenHeavyMask: () => void;
 }
 
 export default function App() {
   const [state, setState] = useState<AppState>(initialState);
   const [now, setNow] = useState(() => Date.now());
+  const [theme, setTheme] = useState<Theme>(loadTheme);
+  const [palette, setPalette] = useState<Palette>(loadPalette);
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,6 +92,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Local storage can be unavailable in restricted webviews.
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PALETTE_STORAGE_KEY, palette);
+    } catch {
+      // Local storage can be unavailable in restricted webviews.
+    }
+  }, [palette]);
+
+  useEffect(() => {
     if (state.expanded) return;
 
     const frame = window.requestAnimationFrame(() => {
@@ -71,7 +117,14 @@ export default function App() {
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [actionError, state.expanded, state.message, state.snapshot?.updatedAt, state.status]);
+  }, [
+    actionError,
+    state.checkpointNotification?.id,
+    state.expanded,
+    state.message,
+    state.snapshot?.updatedAt,
+    state.status,
+  ]);
 
   const run = (action: () => Promise<void>) => {
     setActionError(null);
@@ -82,15 +135,23 @@ export default function App() {
     <Overlay
       state={state}
       now={now}
+      theme={theme}
+      palette={palette}
       actionError={actionError}
       onRefresh={() => run(refreshUsage)}
       onLogin={() => run(beginChatgptLogin)}
       onChooseCodex={() => run(chooseCodexExecutable)}
       onUsePath={() => run(useCodexFromPath)}
       onAutostart={(enabled) => run(() => setAutostartEnabled(enabled))}
+      onRefreshInterval={(seconds) => run(() => setRefreshInterval(seconds))}
+      onCheckpointPercentages={(percentages) => run(() => setCheckpointPercentages(percentages))}
+      onDismissCheckpointNotification={() => run(dismissCheckpointNotification)}
       onExpanded={(expanded) => run(() => setOverlayExpanded(expanded))}
       onDrag={() => run(startOverlayDragging)}
       onHide={() => run(hideOverlay)}
+      onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+      onPaletteChange={setPalette}
+      onOpenHeavyMask={() => run(openHeavyMaskSite)}
     />
   );
 }
@@ -98,15 +159,23 @@ export default function App() {
 export function Overlay({
   state,
   now,
+  theme,
+  palette,
   actionError,
   onRefresh,
   onLogin,
   onChooseCodex,
   onUsePath,
   onAutostart,
+  onRefreshInterval,
+  onCheckpointPercentages,
+  onDismissCheckpointNotification,
   onExpanded,
   onDrag,
   onHide,
+  onToggleTheme,
+  onPaletteChange,
+  onOpenHeavyMask,
 }: OverlayProps) {
   const mainGroups = state.snapshot?.quotaGroups.filter((group) => group.primary) ?? [];
   const additionalGroups =
@@ -114,8 +183,10 @@ export function Overlay({
   const statusLabel = statusText(state);
 
   return (
-    <main className={`overlay-shell ${state.snapshot?.stale ? "is-stale" : ""}`}>
-      <section className="overlay-card" aria-label="Codex usage overlay">
+    <main
+      className={`overlay-shell theme-${theme} palette-${palette} ${state.snapshot?.stale ? "is-stale" : ""}`}
+    >
+      <section className="overlay-card" aria-label="Codex Tracker overlay">
         <header
           className="titlebar"
           onPointerDown={(event) => {
@@ -123,24 +194,17 @@ export function Overlay({
           }}
         >
           <div className="brand">
+            <span className="hm-mark" aria-hidden="true">
+              <img src={sammyLogo} alt="" />
+            </span>
             <span className={`status-dot status-${state.status}`} aria-hidden="true" />
             <div>
-              <h1>Codex Usage</h1>
+              <h1>Codex Tracker</h1>
               <p>{statusLabel}</p>
             </div>
           </div>
           <div className="window-actions" onPointerDown={(event) => event.stopPropagation()}>
             <div className="refresh-control">
-              <button
-                className={`icon-button ${state.updating ? "is-spinning" : ""}`}
-                type="button"
-                aria-label="Refresh usage"
-                title="Refresh now"
-                disabled={state.updating || state.status === "needsCodex"}
-                onClick={onRefresh}
-              >
-                <RefreshIcon />
-              </button>
               <span
                 className="refresh-age"
                 aria-label={
@@ -156,7 +220,26 @@ export function Overlay({
               >
                 {state.snapshot ? formatUpdatedAt(state.snapshot.updatedAt, now) : "Not yet"}
               </span>
+              <button
+                className={`icon-button ${state.updating ? "is-spinning" : ""}`}
+                type="button"
+                aria-label="Refresh usage"
+                title="Refresh now"
+                disabled={state.updating || state.status === "needsCodex"}
+                onClick={onRefresh}
+              >
+                <RefreshIcon />
+              </button>
             </div>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              onClick={onToggleTheme}
+            >
+              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+            </button>
             <button
               className="icon-button"
               type="button"
@@ -170,6 +253,18 @@ export function Overlay({
         </header>
 
         <div className="content" aria-live="polite">
+          {state.checkpointNotification && (
+            <div className="checkpoint-banner" role="alert">
+              <span>{state.checkpointNotification.message}</span>
+              <button
+                type="button"
+                aria-label="Dismiss checkpoint notification"
+                onClick={onDismissCheckpointNotification}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          )}
           {state.status === "needsCodex" ? (
             <ActionState
               title="Codex CLI not found"
@@ -208,6 +303,11 @@ export function Overlay({
                   onChooseCodex={onChooseCodex}
                   onUsePath={onUsePath}
                   onAutostart={onAutostart}
+                  onRefreshInterval={onRefreshInterval}
+                  onCheckpointPercentages={onCheckpointPercentages}
+                  palette={palette}
+                  onPaletteChange={onPaletteChange}
+                  onOpenHeavyMask={onOpenHeavyMask}
                 />
               )}
             </>
@@ -233,6 +333,25 @@ export function Overlay({
       </section>
     </main>
   );
+}
+
+function loadTheme(): Theme {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+function loadPalette(): Palette {
+  try {
+    const stored = window.localStorage.getItem(PALETTE_STORAGE_KEY);
+    return PALETTE_OPTIONS.some((option) => option.id === stored)
+      ? (stored as Palette)
+      : "heavymask";
+  } catch {
+    return "heavymask";
+  }
 }
 
 function QuotaGroupView({ group, now }: { group: QuotaGroup; now: number }) {
@@ -296,6 +415,11 @@ function ExpandedDetails({
   onChooseCodex,
   onUsePath,
   onAutostart,
+  onRefreshInterval,
+  onCheckpointPercentages,
+  palette,
+  onPaletteChange,
+  onOpenHeavyMask,
 }: {
   state: AppState;
   additionalGroups: QuotaGroup[];
@@ -303,6 +427,11 @@ function ExpandedDetails({
   onChooseCodex: () => void;
   onUsePath: () => void;
   onAutostart: (enabled: boolean) => void;
+  onRefreshInterval: (seconds: number) => void;
+  onCheckpointPercentages: (percentages: number[]) => void;
+  palette: Palette;
+  onPaletteChange: (palette: Palette) => void;
+  onOpenHeavyMask: () => void;
 }) {
   const snapshot = state.snapshot!;
   const activity = snapshot.tokenActivity;
@@ -337,7 +466,76 @@ function ExpandedDetails({
         </section>
       )}
 
-      <section className="settings-panel" aria-label="Overlay settings">
+      <div className="maker-credit">
+        <span className="maker-signature">
+          <span className="maker-logo" aria-hidden="true" />
+          <span>Made by <strong>HeavyMask</strong></span>
+        </span>
+        <button
+          className="maker-link"
+          type="button"
+          aria-label="Open HeavyMask website"
+          onClick={onOpenHeavyMask}
+        >
+          heavymask.com
+          <ExternalLinkIcon />
+        </button>
+      </div>
+
+      <section className="settings-panel" role="region" aria-label="Extended settings">
+        <div className="appearance-setting">
+          <div className="appearance-setting-header">
+            <span>
+              <strong>Themes</strong>
+              <small>Choose an accent theme</small>
+            </span>
+            <output>{PALETTE_OPTIONS.find((option) => option.id === palette)?.label}</output>
+          </div>
+          <div className="palette-grid" role="group" aria-label="Theme options">
+            {PALETTE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                className={`palette-option ${palette === option.id ? "is-selected" : ""}`}
+                type="button"
+                aria-pressed={palette === option.id}
+                aria-label={`Select ${option.label} theme`}
+                onClick={() => onPaletteChange(option.id)}
+              >
+                <span className={`palette-swatch palette-swatch-${option.id}`} aria-hidden="true" />
+                <span className="palette-option-copy">
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <CheckpointSettings
+          percentages={state.checkpointPercentages}
+          onSave={onCheckpointPercentages}
+        />
+        <div className="refresh-setting">
+          <div className="refresh-setting-header">
+            <span>
+              <strong>Auto-refresh</strong>
+              <small>How often usage is checked</small>
+            </span>
+            <output>{formatRefreshInterval(snapshotRefreshInterval(state))}</output>
+          </div>
+          <input
+            aria-label="Auto-refresh interval"
+            type="range"
+            min={15}
+            max={300}
+            step={15}
+            value={snapshotRefreshInterval(state)}
+            onChange={(event) => onRefreshInterval(Number(event.currentTarget.value))}
+          />
+          <div className="range-labels" aria-hidden="true">
+            <span>15s</span>
+            <span>5m</span>
+          </div>
+        </div>
         <label className="toggle-row">
           <span>
             <strong>Start with Windows</strong>
@@ -366,6 +564,62 @@ function ExpandedDetails({
         {state.codexVersion && <span title={state.codexVersion}> · Codex connected</span>}
       </footer>
     </div>
+  );
+}
+
+function CheckpointSettings({
+  percentages,
+  onSave,
+}: {
+  percentages: number[];
+  onSave: (percentages: number[]) => void;
+}) {
+  const serializedPercentages = percentages.join(",");
+  const [draft, setDraft] = useState(() => percentages.join(", "));
+  const [submitted, setSubmitted] = useState(false);
+  const parsed = parseCheckpointPercentages(draft);
+  const hasInvalidValue = draft
+    .trim()
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .some((value) => !/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 99);
+
+  useEffect(() => {
+    setDraft(percentages.join(", "));
+    setSubmitted(false);
+  }, [serializedPercentages]);
+
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitted(true);
+    if (!hasInvalidValue) onSave(parsed);
+  }
+
+  return (
+    <form className="checkpoint-setting" onSubmit={save}>
+      <div className="checkpoint-setting-header">
+        <span>
+          <strong>Checkpoints</strong>
+          <small>Notify when remaining usage reaches a level</small>
+        </span>
+        <output>{percentages.length ? `${percentages.length} active` : "Off"}</output>
+      </div>
+      <div className="checkpoint-input-row">
+        <input
+          aria-label="Checkpoint percentages"
+          type="text"
+          inputMode="numeric"
+          value={draft}
+          placeholder="50, 20, 10"
+          onChange={(event) => setDraft(event.currentTarget.value)}
+        />
+        <button type="submit">Save</button>
+      </div>
+      <small className="checkpoint-help">Remaining % · comma-separated · 1–99. Leave blank to turn off.</small>
+      {submitted && hasInvalidValue && (
+        <small className="checkpoint-error" role="alert">Use whole percentages from 1 to 99.</small>
+      )}
+    </form>
   );
 }
 
@@ -464,6 +718,27 @@ function formatUpdatedAt(updatedAt: number, now: number): string {
   return `${Math.floor(seconds / 60)}m ago`;
 }
 
+function snapshotRefreshInterval(state: AppState): number {
+  return Math.max(15, Math.min(300, state.refreshIntervalSecs));
+}
+
+export function formatRefreshInterval(seconds: number): string {
+  if (seconds % 60 === 0) return `Every ${seconds / 60}m`;
+  return `Every ${seconds}s`;
+}
+
+export function parseCheckpointPercentages(value: string): number[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map(Number)
+        .filter((percentage) => Number.isInteger(percentage) && percentage >= 1 && percentage <= 99),
+    ),
+  ).sort((left, right) => right - left);
+}
+
 function compactPath(path: string | null): string {
   if (!path) return "Searching PATH";
   const parts = path.replaceAll("/", "\\").split("\\");
@@ -487,6 +762,31 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="m7 7 10 10M17 7 7 17" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M13 5h6v6M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M12 2.5v2M12 19.5v2M4.7 4.7l1.4 1.4M17.9 17.9l1.4 1.4M2.5 12h2M19.5 12h2M4.7 19.3l1.4-1.4M17.9 6.1l1.4-1.4" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M19.5 15.2A7.5 7.5 0 0 1 8.8 4.5 7.5 7.5 0 1 0 19.5 15.2Z" />
     </svg>
   );
 }

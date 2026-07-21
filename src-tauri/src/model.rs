@@ -24,6 +24,9 @@ pub struct AppStateDto {
     pub autostart_enabled: bool,
     pub expanded: bool,
     pub updating: bool,
+    pub refresh_interval_secs: u64,
+    pub checkpoint_percentages: Vec<u8>,
+    pub checkpoint_notification: Option<CheckpointNotification>,
 }
 
 impl Default for AppStateDto {
@@ -37,8 +40,18 @@ impl Default for AppStateDto {
             autostart_enabled: true,
             expanded: false,
             updating: false,
+            refresh_interval_secs: 60,
+            checkpoint_percentages: vec![50, 20, 10],
+            checkpoint_notification: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckpointNotification {
+    pub id: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

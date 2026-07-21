@@ -15,6 +15,14 @@ export interface AppState {
   autostartEnabled: boolean;
   expanded: boolean;
   updating: boolean;
+  refreshIntervalSecs: number;
+  checkpointPercentages: number[];
+  checkpointNotification: CheckpointNotification | null;
+}
+
+export interface CheckpointNotification {
+  id: string;
+  message: string;
 }
 
 export interface UsageSnapshot {
@@ -72,4 +80,7 @@ export const initialState: AppState = {
   autostartEnabled: true,
   expanded: false,
   updating: false,
+  refreshIntervalSecs: 60,
+  checkpointPercentages: [50, 20, 10],
+  checkpointNotification: null,
 };

@@ -15,6 +15,7 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             show_overlay(app, true);
         }))
@@ -70,10 +71,13 @@ pub fn run() {
             runtime::set_codex_executable,
             runtime::set_autostart_enabled,
             runtime::set_overlay_expanded,
+            runtime::set_refresh_interval,
+            runtime::set_checkpoint_percentages,
+            runtime::dismiss_checkpoint_notification,
             runtime::set_overlay_height,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Codex Usage Overlay");
+        .expect("error while building Codex Tracker");
 
     app.run(|app, event| {
         if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
@@ -106,7 +110,7 @@ fn setup_tray(
                 .expect("application icon should be bundled")
                 .clone(),
         )
-        .tooltip("Codex Usage Overlay")
+        .tooltip("Codex Tracker")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {

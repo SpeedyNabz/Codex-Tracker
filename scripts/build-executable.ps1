@@ -32,7 +32,7 @@ try {
 
     Invoke-CheckedCommand "npm.cmd" @("run", "tauri", "--", "build", "--bundles", "nsis")
 
-    $standaloneExecutable = Join-Path $releaseDirectory "codex-usage-overlay.exe"
+    $standaloneExecutable = Join-Path $releaseDirectory "codex-tracker.exe"
     if (-not (Test-Path -LiteralPath $standaloneExecutable)) {
         throw "The release executable was not created: $standaloneExecutable"
     }
@@ -45,7 +45,7 @@ try {
     }
 
     New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
-    $standaloneArtifact = Join-Path $artifactDirectory "Codex Usage Overlay.exe"
+    $standaloneArtifact = Join-Path $artifactDirectory "Codex Tracker.exe"
     Copy-Item -LiteralPath $standaloneExecutable -Destination $standaloneArtifact -Force
     Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path $artifactDirectory $installer.Name) -Force
 

@@ -1,5 +1,5 @@
 {
-  "name": "codex-usage-overlay",
+  "name": "codex-tracker",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
+    "test:playwright": "node scripts/run-playwright.mjs",
+    "installer:assets": "node scripts/generate-installer-assets.mjs && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/convert-installer-assets.ps1",
     "test:watch": "vitest",
     "tauri": "tauri",
     "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-executable.ps1",
@@ -14,6 +16,7 @@
     "test:live-codex": "node scripts/live-codex-smoke.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.11.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -28,6 +31,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"

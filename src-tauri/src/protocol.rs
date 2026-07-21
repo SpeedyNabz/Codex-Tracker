@@ -142,7 +142,7 @@ impl RpcClient {
                 Some(json!({
                     "clientInfo": {
                         "name": "codex_usage_overlay",
-                        "title": "Codex Usage Overlay",
+                        "title": "Codex Tracker",
                         "version": env!("CARGO_PKG_VERSION")
                     },
                     "capabilities": {

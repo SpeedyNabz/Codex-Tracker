@@ -1,7 +1,12 @@
 use crate::{
-    model::{normalize_snapshot, AppStateDto, ConnectionStatus},
+    model::{
+        normalize_snapshot, AppStateDto, CheckpointNotification, ConnectionStatus, UsageSnapshot,
+    },
     protocol::{RpcClient, RpcEvent},
-    settings::{save as save_settings, Settings},
+    settings::{
+        normalize_checkpoint_percentages, normalize_refresh_interval_secs, save as save_settings,
+        Settings,
+    },
 };
 use chrono::Local;
 use serde::Serialize;
@@ -12,13 +17,14 @@ use std::{
     path::{Path, PathBuf},
     process::Stdio,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex as StdMutex,
     },
     time::Duration,
 };
 use tauri::{menu::CheckMenuItem, AppHandle, Emitter, LogicalSize, Manager, State, Wry};
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_notification::NotificationExt;
 use tokio::{
     process::Command,
     sync::{Mutex, Notify, RwLock},
@@ -43,6 +49,8 @@ pub struct AppRuntime {
     settings_path: PathBuf,
     client: Mutex<Option<Arc<RpcClient>>>,
     refresh_lock: Mutex<()>,
+    refresh_interval_secs: AtomicU64,
+    refresh_interval_changed: Notify,
     restart: Notify,
     stopping: AtomicBool,
     tray_autostart: StdMutex<Option<CheckMenuItem<Wry>>>,
@@ -55,9 +63,16 @@ impl AppRuntime {
         settings_path: PathBuf,
         autostart_enabled: bool,
     ) -> Arc<Self> {
+        let refresh_interval_secs = normalize_refresh_interval_secs(settings.refresh_interval_secs);
+        let mut settings = settings;
+        settings.refresh_interval_secs = refresh_interval_secs;
+        settings.checkpoint_percentages =
+            normalize_checkpoint_percentages(&settings.checkpoint_percentages);
         let state = AppStateDto {
             autostart_enabled,
             expanded: settings.expanded,
+            refresh_interval_secs,
+            checkpoint_percentages: settings.checkpoint_percentages.clone(),
             ..AppStateDto::default()
         };
         Arc::new(Self {
@@ -67,6 +82,8 @@ impl AppRuntime {
             settings_path,
             client: Mutex::new(None),
             refresh_lock: Mutex::new(()),
+            refresh_interval_secs: AtomicU64::new(refresh_interval_secs),
+            refresh_interval_changed: Notify::new(),
             restart: Notify::new(),
             stopping: AtomicBool::new(false),
             tray_autostart: StdMutex::new(None),
@@ -153,13 +170,19 @@ impl AppRuntime {
             reconnect_attempt = 0;
             self.refresh_with_client(&client).await;
 
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            let mut interval = self.refresh_interval();
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
             interval.tick().await;
             let mut reconnect = true;
             loop {
+                let refresh_interval_changed = self.refresh_interval_changed.notified();
                 tokio::select! {
                     _ = interval.tick() => self.refresh_with_client(&client).await,
+                    _ = refresh_interval_changed => {
+                        interval = self.refresh_interval();
+                        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                        interval.tick().await;
+                    }
                     _ = self.restart.notified() => {
                         reconnect = false;
                         client.shutdown().await;
@@ -289,13 +312,34 @@ impl AppRuntime {
         let updated_at = chrono::Utc::now().timestamp();
         match normalize_snapshot(&limits, usage.as_ref().ok(), &today, updated_at) {
             Ok(snapshot) => {
+                let checkpoint_notification = {
+                    let checkpoints = self
+                        .settings
+                        .lock()
+                        .expect("settings lock poisoned")
+                        .checkpoint_percentages
+                        .clone();
+                    let previous = self.state.read().await;
+                    checkpoint_message(previous.snapshot.as_ref(), &snapshot, &checkpoints).map(
+                        |message| CheckpointNotification {
+                            id: format!("checkpoint-{updated_at}"),
+                            message,
+                        },
+                    )
+                };
                 self.update_state(|state| {
                     state.status = ConnectionStatus::Ready;
                     state.snapshot = Some(snapshot);
                     state.message = usage_warning;
                     state.updating = false;
+                    if let Some(notification) = checkpoint_notification.as_ref() {
+                        state.checkpoint_notification = Some(notification.clone());
+                    }
                 })
                 .await;
+                if let Some(notification) = checkpoint_notification {
+                    self.send_checkpoint_notification(&notification.message);
+                }
             }
             Err(error) => {
                 self.update_state(|state| {
@@ -423,6 +467,38 @@ impl AppRuntime {
         Ok(())
     }
 
+    pub async fn set_refresh_interval(&self, seconds: u64) -> Result<(), String> {
+        let seconds = normalize_refresh_interval_secs(seconds);
+        {
+            let mut settings = self.settings.lock().expect("settings lock poisoned");
+            settings.refresh_interval_secs = seconds;
+            save_settings(&self.settings_path, &settings)?;
+        }
+        self.refresh_interval_secs.store(seconds, Ordering::Relaxed);
+        self.update_state(|state| state.refresh_interval_secs = seconds)
+            .await;
+        self.refresh_interval_changed.notify_one();
+        Ok(())
+    }
+
+    pub async fn set_checkpoint_percentages(&self, percentages: Vec<u8>) -> Result<(), String> {
+        let percentages = normalize_checkpoint_percentages(&percentages);
+        {
+            let mut settings = self.settings.lock().expect("settings lock poisoned");
+            settings.checkpoint_percentages = percentages.clone();
+            save_settings(&self.settings_path, &settings)?;
+        }
+        self.update_state(|state| state.checkpoint_percentages = percentages)
+            .await;
+        Ok(())
+    }
+
+    pub async fn dismiss_checkpoint_notification(&self) -> Result<(), String> {
+        self.update_state(|state| state.checkpoint_notification = None)
+            .await;
+        Ok(())
+    }
+
     pub async fn set_overlay_height(&self, height: f64) -> Result<(), String> {
         if !height.is_finite() {
             return Err("Overlay height must be finite".to_string());
@@ -514,6 +590,66 @@ impl AppRuntime {
         };
         let _ = self.app.emit("usage-state-changed", snapshot);
     }
+
+    fn send_checkpoint_notification(&self, message: &str) {
+        if let Err(error) = self
+            .app
+            .notification()
+            .builder()
+            .title("Codex Tracker")
+            .body(message)
+            .show()
+        {
+            eprintln!("Could not show checkpoint notification: {error}");
+        }
+    }
+
+    fn refresh_interval(&self) -> tokio::time::Interval {
+        let seconds = self.refresh_interval_secs.load(Ordering::Relaxed).max(1);
+        tokio::time::interval(Duration::from_secs(seconds))
+    }
+}
+
+fn checkpoint_message(
+    previous: Option<&UsageSnapshot>,
+    current: &UsageSnapshot,
+    checkpoints: &[u8],
+) -> Option<String> {
+    let previous = previous?;
+    let mut reached = Vec::new();
+
+    for group in &current.quota_groups {
+        let Some(previous_group) = previous
+            .quota_groups
+            .iter()
+            .find(|candidate| candidate.id == group.id)
+        else {
+            continue;
+        };
+
+        for window in &group.windows {
+            let Some(previous_window) = previous_group
+                .windows
+                .iter()
+                .find(|candidate| candidate.key == window.key)
+            else {
+                continue;
+            };
+
+            let crossed = checkpoints.iter().copied().filter(|checkpoint| {
+                previous_window.remaining_percent > f64::from(*checkpoint)
+                    && window.remaining_percent <= f64::from(*checkpoint)
+            });
+            for checkpoint in crossed {
+                reached.push(format!(
+                    "{} reached {}% remaining.",
+                    window.label, checkpoint
+                ));
+            }
+        }
+    }
+
+    (!reached.is_empty()).then(|| format!("Checkpoint reached: {}", reached.join(" ")))
 }
 
 fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
@@ -602,10 +738,7 @@ fn windows_codex_search_roots() -> Vec<PathBuf> {
 
     if let Some(program_files) = std::env::var_os("ProgramFiles") {
         let program_files = PathBuf::from(program_files);
-        roots.extend([
-            program_files.join("Codex"),
-            program_files.join("OpenAI"),
-        ]);
+        roots.extend([program_files.join("Codex"), program_files.join("OpenAI")]);
     }
 
     if let Ok(executable) = std::env::current_exe() {
@@ -619,12 +752,7 @@ fn windows_codex_search_roots() -> Vec<PathBuf> {
 
 #[cfg(windows)]
 fn find_codex_executables(root: &Path, max_depth: usize) -> Vec<PathBuf> {
-    fn visit(
-        directory: &Path,
-        depth: usize,
-        max_depth: usize,
-        results: &mut Vec<PathBuf>,
-    ) {
+    fn visit(directory: &Path, depth: usize, max_depth: usize, results: &mut Vec<PathBuf>) {
         let Ok(entries) = fs::read_dir(directory) else {
             return;
         };
@@ -768,6 +896,29 @@ pub async fn set_overlay_expanded(
 }
 
 #[tauri::command]
+pub async fn set_refresh_interval(
+    runtime: State<'_, Arc<AppRuntime>>,
+    seconds: u64,
+) -> Result<(), String> {
+    runtime.set_refresh_interval(seconds).await
+}
+
+#[tauri::command]
+pub async fn set_checkpoint_percentages(
+    runtime: State<'_, Arc<AppRuntime>>,
+    percentages: Vec<u8>,
+) -> Result<(), String> {
+    runtime.set_checkpoint_percentages(percentages).await
+}
+
+#[tauri::command]
+pub async fn dismiss_checkpoint_notification(
+    runtime: State<'_, Arc<AppRuntime>>,
+) -> Result<(), String> {
+    runtime.dismiss_checkpoint_notification().await
+}
+
+#[tauri::command]
 pub async fn set_overlay_height(
     runtime: State<'_, Arc<AppRuntime>>,
     height: f64,
@@ -778,6 +929,7 @@ pub async fn set_overlay_height(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{QuotaGroup, QuotaWindow, TokenActivity};
 
     #[test]
     fn backoff_is_bounded() {
@@ -807,6 +959,62 @@ mod tests {
         push_unique_path(&mut paths, PathBuf::from(r"C:\Users\Test\codex.exe"));
         push_unique_path(&mut paths, PathBuf::from(r"c:\users\test\CODEX.EXE"));
         assert_eq!(paths.len(), 1);
+    }
+
+    #[test]
+    fn refresh_interval_is_bounded() {
+        assert_eq!(normalize_refresh_interval_secs(0), 15);
+        assert_eq!(normalize_refresh_interval_secs(60), 60);
+        assert_eq!(normalize_refresh_interval_secs(600), 300);
+    }
+
+    fn snapshot_with_remaining(remaining_percent: f64) -> UsageSnapshot {
+        UsageSnapshot {
+            quota_groups: vec![QuotaGroup {
+                id: "codex".to_string(),
+                name: "Codex".to_string(),
+                primary: true,
+                plan_type: None,
+                windows: vec![QuotaWindow {
+                    key: "primary".to_string(),
+                    label: "5-hour allowance".to_string(),
+                    used_percent: 100.0 - remaining_percent,
+                    remaining_percent,
+                    window_duration_mins: Some(300),
+                    resets_at: None,
+                }],
+            }],
+            token_activity: TokenActivity::default(),
+            credits: None,
+            updated_at: 1,
+            stale: false,
+        }
+    }
+
+    #[test]
+    fn checkpoint_message_only_reports_downward_crossings() {
+        let previous = snapshot_with_remaining(72.0);
+        let current = snapshot_with_remaining(49.0);
+        let message = checkpoint_message(Some(&previous), &current, &[50, 20]);
+        assert_eq!(
+            message.as_deref(),
+            Some("Checkpoint reached: 5-hour allowance reached 50% remaining.")
+        );
+
+        let still_below = snapshot_with_remaining(48.0);
+        assert!(checkpoint_message(Some(&current), &still_below, &[50, 20]).is_none());
+    }
+
+    #[test]
+    fn checkpoint_message_combines_multiple_levels_crossed_in_one_refresh() {
+        let previous = snapshot_with_remaining(25.0);
+        let current = snapshot_with_remaining(9.0);
+        assert_eq!(
+            checkpoint_message(Some(&previous), &current, &[50, 20, 10]).as_deref(),
+            Some(
+                "Checkpoint reached: 5-hour allowance reached 20% remaining. 5-hour allowance reached 10% remaining."
+            )
+        );
     }
 
     #[cfg(windows)]

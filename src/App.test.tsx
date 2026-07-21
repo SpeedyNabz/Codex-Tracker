@@ -1,6 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { formatResetCountdown, formatTokens, Overlay } from "./App";
+import {
+  formatRefreshInterval,
+  parseCheckpointPercentages,
+  formatResetCountdown,
+  formatTokens,
+  Overlay,
+  type Palette,
+} from "./App";
 import type { AppState } from "./types";
 
 const now = Date.UTC(2026, 6, 20, 12, 0, 0);
@@ -14,6 +21,9 @@ function readyState(overrides: Partial<AppState> = {}): AppState {
     autostartEnabled: true,
     expanded: false,
     updating: false,
+    refreshIntervalSecs: 60,
+    checkpointPercentages: [50, 20, 10],
+    checkpointNotification: null,
     snapshot: {
       quotaGroups: [
         {
@@ -64,14 +74,22 @@ function props(state: AppState) {
   return {
     state,
     now,
+    theme: "dark" as const,
+    palette: "heavymask" as Palette,
     onRefresh: vi.fn(),
     onLogin: vi.fn(),
     onChooseCodex: vi.fn(),
     onUsePath: vi.fn(),
     onAutostart: vi.fn(),
+    onRefreshInterval: vi.fn(),
+    onCheckpointPercentages: vi.fn(),
+    onDismissCheckpointNotification: vi.fn(),
     onExpanded: vi.fn(),
     onDrag: vi.fn(),
     onHide: vi.fn(),
+    onToggleTheme: vi.fn(),
+    onPaletteChange: vi.fn(),
+    onOpenHeavyMask: vi.fn(),
   };
 }
 
@@ -91,7 +109,7 @@ describe("Overlay", () => {
       "false",
     );
 
-    fireEvent.pointerDown(screen.getByRole("heading", { name: "Codex Usage" }), {
+    fireEvent.pointerDown(screen.getByRole("heading", { name: "Codex Tracker" }), {
       button: 0,
     });
     expect(handlers.onDrag).toHaveBeenCalledOnce();
@@ -114,6 +132,15 @@ describe("Overlay", () => {
     expect(screen.getByLabelText("Last refreshed 42s ago")).toBeInTheDocument();
   });
 
+  it("provides a button to switch from dark mode to light mode", () => {
+    const handlers = props(readyState());
+    render(<Overlay {...handlers} />);
+
+    expect(screen.getByRole("main")).toHaveClass("theme-dark");
+    fireEvent.click(screen.getByRole("button", { name: "Switch to light mode" }));
+    expect(handlers.onToggleTheme).toHaveBeenCalledOnce();
+  });
+
   it("shows exact token activity, credits, and settings only when expanded", () => {
     const state = readyState({ expanded: true });
     const handlers = props(state);
@@ -127,6 +154,45 @@ describe("Overlay", () => {
     expect(startup).toBeChecked();
     fireEvent.click(startup);
     expect(handlers.onAutostart).toHaveBeenCalledWith(false);
+
+    expect(screen.getByText("Every 1m")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider", { name: "Auto-refresh interval" }), {
+      target: { value: "120" },
+    });
+    expect(handlers.onRefreshInterval).toHaveBeenCalledWith(120);
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Orchid theme" }));
+    expect(handlers.onPaletteChange).toHaveBeenCalledWith("orchid");
+    expect(screen.getByText("Made by")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open HeavyMask website" }));
+    expect(handlers.onOpenHeavyMask).toHaveBeenCalledOnce();
+  });
+
+  it("lets the user save configurable checkpoint percentages", () => {
+    const state = readyState({ expanded: true });
+    const handlers = props(state);
+    render(<Overlay {...handlers} />);
+
+    const input = screen.getByRole("textbox", { name: "Checkpoint percentages" });
+    expect(input).toHaveValue("50, 20, 10");
+    fireEvent.change(input, { target: { value: "75, 30, 30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(handlers.onCheckpointPercentages).toHaveBeenCalledWith([75, 30]);
+  });
+
+  it("shows and dismisses a checkpoint notification in the popup", () => {
+    const state = readyState({
+      checkpointNotification: {
+        id: "checkpoint-1",
+        message: "Checkpoint reached: 5-hour allowance reached 50% remaining.",
+      },
+    });
+    const handlers = props(state);
+    render(<Overlay {...handlers} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(state.checkpointNotification!.message);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss checkpoint notification" }));
+    expect(handlers.onDismissCheckpointNotification).toHaveBeenCalledOnce();
   });
 
   it("renders missing Codex and sign-in recovery actions", () => {
@@ -173,6 +239,10 @@ describe("Overlay", () => {
 });
 
 describe("formatting", () => {
+  it("normalizes checkpoint input into unique descending percentages", () => {
+    expect(parseCheckpointPercentages("10, 50 10, 0, 100, 25.5, 20")).toEqual([50, 20, 10]);
+  });
+
   it("formats countdown rollover and absent reset times", () => {
     expect(formatResetCountdown(null, now)).toBe("Reset time unavailable");
     expect(formatResetCountdown(now / 1_000 - 1, now)).toBe(
@@ -186,5 +256,11 @@ describe("formatting", () => {
     expect(formatTokens("9007199254740993")).not.toBe("Unavailable");
     expect(formatTokens("not-a-number")).toBe("Unavailable");
     expect(formatTokens(null)).toBe("Unavailable");
+  });
+
+  it("formats auto-refresh intervals for the settings slider", () => {
+    expect(formatRefreshInterval(15)).toBe("Every 15s");
+    expect(formatRefreshInterval(60)).toBe("Every 1m");
+    expect(formatRefreshInterval(300)).toBe("Every 5m");
   });
 });

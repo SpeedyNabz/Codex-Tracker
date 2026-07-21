@@ -40,12 +40,36 @@ export async function useCodexFromPath(): Promise<void> {
   await invoke("set_codex_executable", { path: null });
 }
 
+export const HEAVY_MASK_URL = "https://heavymask.com/";
+
+export async function openHeavyMaskSite(): Promise<void> {
+  try {
+    await openUrl(HEAVY_MASK_URL);
+  } catch (error) {
+    const fallbackWindow = window.open(HEAVY_MASK_URL, "_blank", "noopener,noreferrer");
+    if (fallbackWindow) return;
+    throw error;
+  }
+}
+
 export async function setAutostartEnabled(enabled: boolean): Promise<void> {
   await invoke("set_autostart_enabled", { enabled });
 }
 
 export async function setOverlayExpanded(expanded: boolean): Promise<void> {
   await invoke("set_overlay_expanded", { expanded });
+}
+
+export async function setRefreshInterval(seconds: number): Promise<void> {
+  await invoke("set_refresh_interval", { seconds });
+}
+
+export async function setCheckpointPercentages(percentages: number[]): Promise<void> {
+  await invoke("set_checkpoint_percentages", { percentages });
+}
+
+export async function dismissCheckpointNotification(): Promise<void> {
+  await invoke("dismiss_checkpoint_notification");
 }
 
 export async function setOverlayHeight(height: number): Promise<void> {
