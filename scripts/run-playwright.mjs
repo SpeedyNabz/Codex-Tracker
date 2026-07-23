@@ -1,3 +1,7 @@
+// Starts the Vite preview server, runs the Playwright visual suite against it,
+// and shuts down both child processes while preserving the test exit code.
+// Made by Heavymask — https://heavymask.com
+
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 

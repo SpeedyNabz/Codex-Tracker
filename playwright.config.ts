@@ -1,3 +1,8 @@
+/**
+ * Configures the Playwright visual test suite, preview URL, browser profile,
+ * timing, viewport, and failure screenshot behavior.
+ * Made by Heavymask — https://heavymask.com
+ */
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({

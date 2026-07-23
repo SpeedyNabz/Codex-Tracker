@@ -1,4 +1,6 @@
 [CmdletBinding()]
+# Converts generated PNG installer artwork into the BMP files required by the
+# Windows NSIS bundler. Made by Heavymask — https://heavymask.com
 param()
 
 $ErrorActionPreference = "Stop"

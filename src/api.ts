@@ -1,3 +1,8 @@
+/**
+ * Provides the typed bridge between the React interface and Tauri commands,
+ * events, native dialogs, window controls, and external links.
+ * Made by Heavymask — https://heavymask.com
+ */
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";

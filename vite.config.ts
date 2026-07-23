@@ -1,3 +1,8 @@
+/**
+ * Configures Vite, React, asset handling, local development, and Vitest for
+ * the frontend portion of the Codex Tracker project.
+ * Made by Heavymask — https://heavymask.com
+ */
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 

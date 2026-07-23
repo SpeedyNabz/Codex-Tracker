@@ -1,3 +1,7 @@
+//! Defines the serializable Rust data model shared by the runtime, Codex
+//! protocol mapping, persisted state, and React frontend.
+//! Made by Heavymask — https://heavymask.com
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;

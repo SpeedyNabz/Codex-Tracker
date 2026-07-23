@@ -1,3 +1,8 @@
+/**
+ * Tests the overlay's formatting, rendering, controls, and state-driven UI
+ * behavior so frontend changes remain safe as the tracker evolves.
+ * Made by Heavymask — https://heavymask.com
+ */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {

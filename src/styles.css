@@ -1,3 +1,8 @@
+/*
+ * Defines the Codex Tracker overlay's layout, responsive states, themes,
+ * controls, progress visuals, and HeavyMask visual language.
+ * Made by Heavymask — https://heavymask.com
+ */
 :root {
   color: var(--text);
   font-family:

@@ -1,3 +1,7 @@
+//! Loads, validates, normalizes, and persists the user's Codex Tracker
+//! settings, including window state, refresh preferences, and checkpoints.
+//! Made by Heavymask — https://heavymask.com
+
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};

@@ -1,3 +1,6 @@
+# Generates stable TypeScript app-server bindings from the installed Codex
+# CLI and records the source version in the protocol lock file.
+# Made by Heavymask — https://heavymask.com
 param(
     [string]$OutputDirectory = "src/codex-protocol"
 )

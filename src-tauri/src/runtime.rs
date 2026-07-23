@@ -1,3 +1,7 @@
+//! Owns the live application runtime: Codex discovery and supervision,
+//! usage refreshes, settings commands, notifications, and frontend events.
+//! Made by Heavymask — https://heavymask.com
+
 use crate::{
     model::{
         normalize_snapshot, AppStateDto, CheckpointNotification, ConnectionStatus, UsageSnapshot,

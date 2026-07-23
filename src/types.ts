@@ -1,3 +1,9 @@
+/**
+ * Defines the shared frontend data contracts for connection state, quotas,
+ * token activity, credits, notifications, and initial application state.
+ * These types keep the React UI aligned with the Rust backend DTOs.
+ * Made by Heavymask — https://heavymask.com
+ */
 export type ConnectionStatus =
   | "starting"
   | "needsCodex"

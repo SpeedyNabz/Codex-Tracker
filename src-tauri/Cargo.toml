@@ -1,4 +1,6 @@
 [package]
+# Defines the Rust/Tauri package that provides the Codex Tracker native shell
+# and its backend dependencies. Made by Heavymask — https://heavymask.com
 name = "codex-tracker"
 version = "0.1.0"
 description = "A live Codex allowance and token-activity overlay for Windows, made by HeavyMask"

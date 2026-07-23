@@ -1,3 +1,6 @@
+// Renders HeavyMask SVG branding into PNG installer artwork at the exact
+// dimensions expected by the Windows NSIS package. Made by Heavymask — https://heavymask.com
+
 import { chromium } from "playwright";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

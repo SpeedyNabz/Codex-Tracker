@@ -1,3 +1,7 @@
+// Performs a live, minimal Codex app-server JSON-RPC check to verify that the
+// installed CLI exposes the allowance and usage data the application needs.
+// Made by Heavymask — https://heavymask.com
+
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 

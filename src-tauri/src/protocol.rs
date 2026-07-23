@@ -1,3 +1,7 @@
+//! Implements the asynchronous JSON-RPC client that launches Codex's
+//! app-server, sends requests, receives notifications, and tracks responses.
+//! Made by Heavymask — https://heavymask.com
+
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,

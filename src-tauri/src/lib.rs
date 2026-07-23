@@ -1,3 +1,8 @@
+//! Builds and runs the Tauri application, wiring plugins, tray behavior,
+//! window placement, autostart, runtime state, and frontend command handlers
+//! into the native Codex Tracker shell.
+//! Made by Heavymask — https://heavymask.com
+
 mod model;
 mod protocol;
 mod runtime;

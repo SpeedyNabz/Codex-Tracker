@@ -1,3 +1,9 @@
+/**
+ * Renders the Codex Tracker overlay and coordinates its UI state, controls,
+ * themes, quota presentation, and user actions through the Tauri API layer.
+ * This is the main frontend surface of the project.
+ * Made by Heavymask — https://heavymask.com
+ */
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {

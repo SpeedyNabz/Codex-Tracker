@@ -1,4 +1,7 @@
 [CmdletBinding()]
+# Runs the validated frontend test/build pipeline, creates the Windows NSIS
+# installer, and copies release artifacts into the repository artifacts folder.
+# Made by Heavymask — https://heavymask.com
 param(
     [switch]$SkipTests
 )

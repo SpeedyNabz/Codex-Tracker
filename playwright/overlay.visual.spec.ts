@@ -1,3 +1,8 @@
+/**
+ * Exercises the overlay in representative dark and light host backgrounds,
+ * capturing visual evidence that the compact tracker remains readable.
+ * Made by Heavymask — https://heavymask.com
+ */
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 
