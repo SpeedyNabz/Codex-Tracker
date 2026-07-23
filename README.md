@@ -186,4 +186,10 @@ cargo check --manifest-path src-tauri\Cargo.toml
 npm.cmd run test:playwright -- --workers=1
 ```
 
+## License
+
+Codex Tracker is licensed under the [Apache License, Version 2.0](LICENSE).
+HeavyMask names, logos, and other brand assets remain subject to the notices
+in [NOTICE](NOTICE).
+
 Made by [Heavymask](https://heavymask.com).

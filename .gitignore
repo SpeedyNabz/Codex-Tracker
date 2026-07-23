@@ -4,5 +4,26 @@ artifacts/
 test-results/
 src-tauri/target/
 src/codex-protocol/
-*.log
+coverage/
+
+# Local environment files and credentials
+.env
+.env.*
+!.env.example
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+*.secrets
+secrets/
+
+# Local editor and operating-system metadata
+.vscode/
+.idea/
+.fleet/
 .DS_Store
+Thumbs.db
+Desktop.ini
+*.log

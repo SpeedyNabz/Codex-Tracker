@@ -42,7 +42,7 @@ const state = {
   },
   message: null,
   codexVersion: "0.1.0",
-  codexPath: "C:\\Users\\HeavyMask\\AppData\\Local\\Codex\\codex.exe",
+  codexPath: "C:\\Users\\Example\\AppData\\Local\\Codex\\codex.exe",
   autostartEnabled: true,
   expanded: false,
   updating: false,
