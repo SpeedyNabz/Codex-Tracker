@@ -134,6 +134,9 @@ test.describe("overlay appearance", () => {
         });
         expect(percentageTextStyle).toContain("linear-gradient");
         themePercentageText.add(percentageTextStyle);
+        await page.screenshot({
+          path: `artifacts/playwright/overlay-${scenario.mode}-${theme.toLowerCase()}.png`,
+        });
 
         if (theme === "HeavyMask") {
           const heavyMaskColors = await shell.evaluate((element) => {

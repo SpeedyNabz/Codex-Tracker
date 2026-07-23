@@ -1,102 +1,189 @@
-# Codex Tracker by HeavyMask
+# Codex Tracker
 
-Made by [HeavyMask](https://heavymask.com).
+Made by [Heavymask](https://heavymask.com).
 
-A lightweight Windows overlay for live Codex allowance percentages, reset times,
-daily and lifetime token activity, and additional credits. It uses the installed
-Codex CLI's supported `app-server` interface and never reads or copies Codex
+Codex Tracker is a lightweight Windows desktop overlay for monitoring live
+Codex allowance windows, reset times, token activity, and account credits. It
+connects to the installed Codex CLI through its supported `app-server` JSON-RPC
+interface and keeps authentication in Codex rather than reading local
 authentication files.
 
-## What it shows
+## At a glance
 
-- Every allowance window returned for the main Codex quota bucket
-- Percentage remaining and a live reset countdown
-- Today's and lifetime token activity in the expanded view
-- Credit and spend-control information when the account provides it
-- A visible stale state while the local app-server reconnects
+![Codex Tracker in dark mode](docs/assets/overlay-dark.png)
 
-Included-plan quotas are deliberately labelled as **allowance remaining**. Codex
-does not expose an absolute token capacity for those windows, so this app never
-claims to know an exact number of tokens left.
+The compact overlay stays above normal windows and can be dragged from its
+header. It is designed to make the most important account information visible
+without requiring a full dashboard or a browser tab.
 
-## Requirements
+## Features and functionality
 
-- Windows 10 or Windows 11, x64
-- An installed Codex CLI. The app checks PATH, common user install folders, and
-  VS Code/Cursor extension installs, or its path can be selected in the app
-- A ChatGPT account signed into Codex
-- Node.js 20 or newer and Rust 1.77.2 or newer to build from source
+| Feature | What it does | Why it matters |
+| --- | --- | --- |
+| Live allowance tracking | Displays every allowance window returned for the main Codex quota bucket. | Shows the current account state without guessing an absolute token capacity. |
+| Remaining percentages | Presents used and remaining percentages with clear visual progress bars. | Makes quota consumption easy to scan at a glance. |
+| Reset countdowns | Shows the time remaining until each allowance window resets. | Helps plan work around the next available quota window. |
+| Token activity | Expanded mode shows today’s tokens, lifetime tokens, and peak daily tokens. | Provides useful activity context alongside allowance percentages. |
+| Credits and spend controls | Displays additional credits, unlimited status, balance, and spend-control information when supplied by Codex. | Keeps paid usage information in the same monitoring surface. |
+| Codex discovery | Searches supported install locations and PATH, or lets the user choose `codex.exe` directly. | Works with common Windows installations while retaining a manual fallback. |
+| Browser sign-in | Opens Codex authentication in the system browser when sign-in is required. | Keeps credential handling inside the official Codex flow. |
+| Reconnection handling | Supervises the private Codex app-server process and retains the last snapshot as stale while reconnecting. | Avoids turning a temporary connection problem into an empty dashboard. |
+| Refresh controls | Supports manual refresh plus a configurable automatic refresh interval. | Lets users balance freshness and background activity. |
+| Usage checkpoints | Accepts configurable percentage thresholds and notifies the user when remaining usage crosses them downward. | Provides an early warning before a quota window is exhausted. |
+| Themes and palettes | Includes dark/light modes and HeavyMask, Ocean, Orchid, Ember, and Forest palettes. | Supports different environments while preserving readable contrast. |
+| Tray behavior | Closing the overlay hides it to the Windows tray; tray actions can show or quit the app. | Keeps the tracker available without occupying taskbar space. |
+| Start with Windows | Enables autostart by default and exposes a setting to disable it. | Makes monitoring available after login without manual relaunching. |
+| Native Windows packaging | Builds a standalone executable and NSIS installer with HeavyMask branding. | Provides a distributable desktop application rather than only a development build. |
 
-## Development
+## Demonstrations
+
+### Dark-mode monitoring
+
+![Dark-mode Codex Tracker demonstration](docs/assets/overlay-dark.png)
+
+This capture demonstrates the main monitoring view with:
+
+- a five-hour allowance at 72% remaining;
+- a weekly allowance at 57% remaining;
+- reset countdowns for both windows;
+- today and lifetime token totals;
+- additional credits;
+- active HeavyMask branding;
+- theme palette choices; and
+- three active usage checkpoints.
+
+#### Dark-mode palette gallery
+
+In dark mode, the selected palette drives the progress gradients, remaining
+percentage emphasis, controls, borders, and other accent details while the
+dark glass surface keeps the overlay low-glare.
+
+<table>
+  <tr>
+    <td><img src="docs/assets/overlay-dark-heavymask.png" alt="Dark mode with HeavyMask palette" width="180"></td>
+    <td><img src="docs/assets/overlay-dark-ocean.png" alt="Dark mode with Ocean palette" width="180"></td>
+    <td><img src="docs/assets/overlay-dark-orchid.png" alt="Dark mode with Orchid palette" width="180"></td>
+    <td><img src="docs/assets/overlay-dark-ember.png" alt="Dark mode with Ember palette" width="180"></td>
+    <td><img src="docs/assets/overlay-dark-forest.png" alt="Dark mode with Forest palette" width="180"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>HeavyMask</strong><br>Yellow + mint</td>
+    <td align="center"><strong>Ocean</strong><br>Blue + aqua</td>
+    <td align="center"><strong>Orchid</strong><br>Violet + pink</td>
+    <td align="center"><strong>Ember</strong><br>Amber + coral</td>
+    <td align="center"><strong>Forest</strong><br>Mint + green</td>
+  </tr>
+</table>
+
+### Light-mode monitoring
+
+![Light-mode Codex Tracker demonstration](docs/assets/overlay-light.png)
+
+The same information remains readable on a light host background. The palette
+and controls adapt while the quota data, reset times, token totals, credits,
+and checkpoint status remain consistent.
+
+#### Light-mode palette gallery
+
+Light mode uses the same five palettes with lighter surfaces and adjusted text
+contrast. This makes the accent choice visible without sacrificing readability
+on bright desktop backgrounds.
+
+<table>
+  <tr>
+    <td><img src="docs/assets/overlay-light-heavymask.png" alt="Light mode with HeavyMask palette" width="180"></td>
+    <td><img src="docs/assets/overlay-light-ocean.png" alt="Light mode with Ocean palette" width="180"></td>
+    <td><img src="docs/assets/overlay-light-orchid.png" alt="Light mode with Orchid palette" width="180"></td>
+    <td><img src="docs/assets/overlay-light-ember.png" alt="Light mode with Ember palette" width="180"></td>
+    <td><img src="docs/assets/overlay-light-forest.png" alt="Light mode with Forest palette" width="180"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>HeavyMask</strong><br>Yellow + mint</td>
+    <td align="center"><strong>Ocean</strong><br>Blue + aqua</td>
+    <td align="center"><strong>Orchid</strong><br>Violet + pink</td>
+    <td align="center"><strong>Ember</strong><br>Amber + coral</td>
+    <td align="center"><strong>Forest</strong><br>Mint + green</td>
+  </tr>
+</table>
+
+All palettes are selectable from the expanded **Themes** panel. The choice is
+stored locally, so the preferred palette is restored the next time the overlay
+opens.
+
+### Typical user flow
+
+```text
+Launch Codex Tracker
+        |
+        v
+Find codex.exe and start Codex app-server
+        |
+        +--> Codex needs authentication? --> Open browser sign-in
+        |
+        v
+Read allowance, usage, and credit snapshots
+        |
+        v
+Render compact overlay and refresh on schedule
+        |
+        +--> Threshold crossed? --> Show in-app and Windows notification
+        |
+        +--> Connection interrupted? --> Keep stale snapshot and reconnect
+```
+
+## How to build
+
+### Install prerequisites
 
 ```powershell
 npm.cmd install
 npm.cmd run tauri dev
 ```
 
-The overlay starts in the top-right corner, stays above normal windows, and can
-be dragged by its header. Closing it hides it to the tray. Use the tray's **Quit**
-command to terminate the overlay and its private app-server child process.
-
-On first launch, Start with Windows is enabled. It can be disabled from the
-expanded overlay or tray menu.
-
-### Build the Windows executable
+### Build executable
 
 ```powershell
 npm.cmd run build:exe
 ```
 
-This runs the test suite, builds the release app, creates the NSIS installer,
-and copies both outputs into `artifacts\`:
+## Project architecture
 
-- `Codex Tracker.exe` — standalone release executable
-- `Codex Tracker_<version>_x64-setup.exe` — Windows installer
+```mermaid
+flowchart LR
+    UI[React overlay\nApp.tsx] --> API[Tauri bridge\napi.ts]
+    API --> COMMANDS[Tauri commands]
+    COMMANDS --> RUNTIME[AppRuntime\nRust]
+    RUNTIME --> PROTOCOL[RpcClient\nJSON-RPC]
+    PROTOCOL --> CODEX[Codex CLI\napp-server --stdio]
+    RUNTIME --> SETTINGS[Persisted settings]
+    RUNTIME --> EVENTS[usage-state-changed events]
+    EVENTS --> UI
+```
 
-Use `powershell -NoProfile -ExecutionPolicy Bypass -File
-scripts\build-executable.ps1 -SkipTests` when rebuilding after tests have
-already passed.
+The frontend is responsible for presentation, interaction, formatting, and
+theme state. The Rust backend owns native window/tray behavior, process
+supervision, settings persistence, Codex communication, notifications, and
+the typed state sent back to React.
+
+## Safety and data handling
+
+- Codex authentication remains managed by Codex and the system browser.
+- The app communicates with the Codex CLI through `codex app-server --stdio`.
+- Large token values are preserved as decimal strings/`BigInt`-compatible data
+  instead of being forced through JavaScript `Number` precision.
+- If a connection drops, the last in-memory snapshot is marked stale while
+  the runtime attempts to reconnect.
 
 ## Verification
+
+The project includes frontend unit tests, a TypeScript/Vite build, Rust checks,
+live Codex response-shape smoke testing, and Playwright visual coverage:
 
 ```powershell
 npm.cmd test
 npm.cmd run build
-cargo test --manifest-path src-tauri\Cargo.toml
-cargo clippy --manifest-path src-tauri\Cargo.toml --all-targets -- -D warnings
-npm.cmd run tauri build
+cargo check --manifest-path src-tauri\Cargo.toml
+npm.cmd run test:playwright -- --workers=1
 ```
 
-An opt-in live smoke uses the existing Codex login but prints only response-shape
-counts, never raw usage:
-
-```powershell
-npm.cmd run test:live-codex
-```
-
-## Protocol maintenance
-
-The app uses stable app-server methods and runtime capability checks. Generate a
-fresh TypeScript protocol snapshot after upgrading Codex:
-
-```powershell
-npm.cmd run protocol:generate
-```
-
-Generated files are intentionally ignored; `codex-protocol.lock.json` records the
-Codex version against which the protocol was last reviewed.
-
-## Troubleshooting
-
-- **Codex CLI not found:** The app checks PATH, `%USERPROFILE%\.vscode\extensions`,
-  VS Code Insiders/Cursor extension folders, and common Codex/OpenAI install
-  folders. If Codex was installed after the app started, use **Use Codex from
-  PATH** to retry or choose the installed `codex.exe` directly.
-- **Sign-in required:** Select **Sign in with Codex**. Authentication remains
-  managed by Codex in the system browser.
-- **Reconnecting:** The last in-memory snapshot remains visible and marked stale.
-  Use **Refresh now** after network access returns.
-- **No 5-hour row:** The app maps Codex's primary rate-limit window to the
-  five-hour tracker, including responses where the server omits the duration
-  metadata. If primary is absent entirely, Codex has not provided a valid
-  five-hour percentage to display.
+Made by [Heavymask](https://heavymask.com).
