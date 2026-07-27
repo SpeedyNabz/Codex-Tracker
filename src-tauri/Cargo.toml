@@ -4,7 +4,7 @@
 name = "codex-tracker"
 version = "0.1.0"
 license = "Apache-2.0"
-description = "A live Codex allowance and token-activity overlay for Windows, made by HeavyMask"
+description = "A live cross-platform Codex allowance and token-activity overlay, made by HeavyMask"
 authors = ["HeavyMask"]
 homepage = "https://heavymask.com"
 edition = "2021"

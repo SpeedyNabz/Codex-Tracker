@@ -2,7 +2,7 @@
 
 Made by [Heavymask](https://heavymask.com).
 
-Codex Tracker is a lightweight Windows desktop overlay for monitoring live
+Codex Tracker is a lightweight Windows, macOS, and Linux desktop overlay for monitoring live
 Codex allowance windows, reset times, token activity, and account credits. It
 connects to the installed Codex CLI through its supported `app-server` JSON-RPC
 interface and keeps authentication in Codex rather than reading local
@@ -25,15 +25,15 @@ without requiring a full dashboard or a browser tab.
 | Reset countdowns | Shows the time remaining until each allowance window resets. | Helps plan work around the next available quota window. |
 | Token activity | Expanded mode shows today’s tokens, lifetime tokens, and peak daily tokens. | Provides useful activity context alongside allowance percentages. |
 | Credits and spend controls | Displays additional credits, unlimited status, balance, and spend-control information when supplied by Codex. | Keeps paid usage information in the same monitoring surface. |
-| Codex discovery | Searches supported install locations and PATH, or lets the user choose `codex.exe` directly. | Works with common Windows installations while retaining a manual fallback. |
+| Codex discovery | Searches supported install locations and PATH, or lets the user choose the Codex executable directly. | Works with common Windows, macOS, and Linux installations while retaining a manual fallback. |
 | Browser sign-in | Opens Codex authentication in the system browser when sign-in is required. | Keeps credential handling inside the official Codex flow. |
 | Reconnection handling | Supervises the private Codex app-server process and retains the last snapshot as stale while reconnecting. | Avoids turning a temporary connection problem into an empty dashboard. |
 | Refresh controls | Supports manual refresh plus a configurable automatic refresh interval. | Lets users balance freshness and background activity. |
 | Usage checkpoints | Accepts configurable percentage thresholds and notifies the user when remaining usage crosses them downward. | Provides an early warning before a quota window is exhausted. |
 | Themes and palettes | Includes dark/light modes and HeavyMask, Ocean, Orchid, Ember, and Forest palettes. | Supports different environments while preserving readable contrast. |
-| Tray behavior | Closing the overlay hides it to the Windows tray; tray actions can show or quit the app. | Keeps the tracker available without occupying taskbar space. |
-| Start with Windows | Enables autostart by default and exposes a setting to disable it. | Makes monitoring available after login without manual relaunching. |
-| Native Windows packaging | Builds a standalone executable and NSIS installer with HeavyMask branding. | Provides a distributable desktop application rather than only a development build. |
+| Tray behavior | Closing the overlay hides it to the system tray; tray actions can show or quit the app. | Keeps the tracker available without occupying taskbar or dock space. |
+| Start at login | Enables autostart by default and exposes a setting to disable it. | Makes monitoring available after login without manual relaunching. |
+| Native desktop packaging | Builds a Windows NSIS installer, universal macOS DMG, Linux AppImage, and Debian package with HeavyMask branding. | Provides native distributable applications rather than only a development build. |
 
 ## Demonstrations
 
@@ -116,7 +116,7 @@ opens.
 Launch Codex Tracker
         |
         v
-Find codex.exe and start Codex app-server
+Find the Codex executable and start Codex app-server
         |
         +--> Codex needs authentication? --> Open browser sign-in
         |
@@ -126,7 +126,7 @@ Read allowance, usage, and credit snapshots
         v
 Render compact overlay and refresh on schedule
         |
-        +--> Threshold crossed? --> Show in-app and Windows notification
+        +--> Threshold crossed? --> Show in-app and desktop notification
         |
         +--> Connection interrupted? --> Keep stale snapshot and reconnect
 ```
@@ -140,11 +140,49 @@ npm.cmd install
 npm.cmd run tauri dev
 ```
 
-### Build executable
+All release builds require Node.js 22 and the stable Rust toolchain. Windows
+also requires the Visual C++ build tools and WebView2. macOS requires Xcode
+Command Line Tools plus both Apple Rust targets:
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+```
+
+Linux requires Tauri's WebKit and tray build dependencies. On Ubuntu 22.04:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+```
+
+### Build native releases
+
+Each command runs the frontend tests, performs a release-mode Tauri build, and
+copies the finished installer bundles into `artifacts/`.
 
 ```powershell
+# Windows
 npm.cmd run build:exe
 ```
+
+```bash
+# macOS: universal Apple Silicon + Intel DMG
+npm run build:macos
+
+# Linux x64: AppImage + Debian package
+npm run build:linux
+```
+
+The macOS and Linux commands must run on their native operating system. Tauri
+does not create those desktop bundles from Windows. The current packages are
+not code-signed or notarized.
+
+### Publish macOS and Linux bundles
+
+The `Release macOS and Linux` GitHub Actions workflow builds on native runners,
+records SHA-256 checksums, and uploads the DMG, AppImage, and Debian package to
+the existing `heavymask` release. It can also be run manually with a different
+existing release tag.
 
 ## Project architecture
 

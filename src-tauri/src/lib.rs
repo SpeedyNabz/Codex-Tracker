@@ -36,7 +36,7 @@ pub fn run() {
             let autostart = app.autolaunch();
             if !settings.autostart_initialized {
                 if let Err(error) = autostart.enable() {
-                    eprintln!("Could not enable Windows startup: {error}");
+                    eprintln!("Could not enable startup: {error}");
                 }
                 settings.autostart_initialized = true;
                 let _ = settings::save(&loaded.path, &settings);
@@ -44,7 +44,7 @@ pub fn run() {
                 // Re-register an enabled entry so an installed build replaces a
                 // development or previously installed executable path.
                 if let Err(error) = autostart.enable() {
-                    eprintln!("Could not refresh Windows startup: {error}");
+                    eprintln!("Could not refresh startup: {error}");
                 }
             }
             let autostart_enabled = autostart.is_enabled().unwrap_or(false);
@@ -99,7 +99,7 @@ fn setup_tray(
 ) -> tauri::Result<()> {
     let show = MenuItemBuilder::with_id("show", "Show / Hide").build(app)?;
     let refresh = MenuItemBuilder::with_id("refresh", "Refresh now").build(app)?;
-    let autostart = CheckMenuItemBuilder::with_id("autostart", "Start with Windows")
+    let autostart = CheckMenuItemBuilder::with_id("autostart", "Start at login")
         .checked(autostart_enabled)
         .build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;

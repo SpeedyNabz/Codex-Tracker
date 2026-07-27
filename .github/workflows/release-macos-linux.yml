@@ -1,0 +1,100 @@
+name: Release macOS and Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to receive the native bundles
+        required: true
+        default: heavymask
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-macos-linux.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-release-${{ github.repository }}-${{ github.event.inputs.release_tag || 'heavymask' }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal DMG
+            runner: macos-14
+            build_script: build:macos
+            release_assets: artifacts/*.dmg
+            checksum_name: Codex.Tracker_macos-universal_sha256.txt
+          - name: Linux x64 AppImage and Debian package
+            runner: ubuntu-22.04
+            build_script: build:linux
+            release_assets: artifacts/*.AppImage artifacts/*.deb
+            checksum_name: Codex.Tracker_linux-x64_sha256.txt
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Install macOS Rust targets
+        if: runner.os == 'macOS'
+        shell: bash
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build validated native release
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
+        run: npm run ${{ matrix.build_script }}
+
+      - name: Record SHA-256 checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path artifacts -File |
+            Get-FileHash -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  $($_.Path | Split-Path -Leaf)" } |
+            Set-Content -Path "artifacts/${{ matrix.checksum_name }}"
+
+      - name: Upload bundles to GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag || 'heavymask' }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            ${{ matrix.release_assets }} \
+            "artifacts/${{ matrix.checksum_name }}" \
+            --clobber

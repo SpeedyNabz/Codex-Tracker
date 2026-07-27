@@ -274,8 +274,8 @@ export function Overlay({
           {state.status === "needsCodex" ? (
             <ActionState
               title="Codex CLI not found"
-              message={state.message ?? "Choose your installed codex.exe to continue."}
-              actionLabel="Choose codex.exe"
+              message={state.message ?? "Choose your installed Codex executable to continue."}
+              actionLabel="Choose Codex executable"
               onAction={onChooseCodex}
             />
           ) : state.status === "needsAuth" && !state.snapshot ? (
@@ -544,8 +544,8 @@ function ExpandedDetails({
         </div>
         <label className="toggle-row">
           <span>
-            <strong>Start with Windows</strong>
-            <small>Keep usage visible after sign-in</small>
+            <strong>Start at login</strong>
+            <small>Keep usage visible after you sign in</small>
           </span>
           <input
             type="checkbox"
@@ -747,9 +747,10 @@ export function parseCheckpointPercentages(value: string): number[] {
 
 function compactPath(path: string | null): string {
   if (!path) return "Searching PATH";
-  const parts = path.replaceAll("/", "\\").split("\\");
+  const separator = path.includes("\\") ? "\\" : "/";
+  const parts = path.split(/[\\/]/);
   if (parts.length <= 3) return path;
-  return `…\\${parts.slice(-3).join("\\")}`;
+  return `…${separator}${parts.slice(-3).join(separator)}`;
 }
 
 function errorMessage(error: unknown): string {

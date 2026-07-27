@@ -31,10 +31,9 @@ export async function beginChatgptLogin(): Promise<void> {
 
 export async function chooseCodexExecutable(): Promise<void> {
   const selected = await open({
-    title: "Choose the installed codex.exe",
+    title: "Choose the installed Codex executable",
     multiple: false,
     directory: false,
-    filters: [{ name: "Codex executable", extensions: ["exe"] }],
   });
   if (typeof selected === "string") {
     await invoke("set_codex_executable", { path: selected });

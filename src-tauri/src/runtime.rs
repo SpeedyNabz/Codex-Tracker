@@ -15,7 +15,7 @@ use crate::{
 use chrono::Local;
 use serde::Serialize;
 use serde_json::{json, Value};
-#[cfg(windows)]
+#[cfg(any(windows, unix))]
 use std::fs;
 use std::{
     path::{Path, PathBuf},
@@ -107,7 +107,7 @@ impl AppRuntime {
                     self.update_state(|state| {
                         state.status = ConnectionStatus::NeedsCodex;
                         state.message = Some(
-                            "Codex CLI not found. Checked PATH and common install locations; choose codex.exe to continue.".to_string(),
+                            "Codex CLI not found. Checked PATH and common install locations; choose the Codex executable to continue.".to_string(),
                         );
                         state.codex_path = None;
                         state.codex_version = None;
@@ -404,13 +404,16 @@ impl AppRuntime {
     pub async fn set_codex_path(&self, path: Option<String>) -> Result<(), String> {
         if let Some(path) = path.as_deref() {
             let path = Path::new(path);
-            if !path.is_file()
-                || path
-                    .extension()
-                    .and_then(|extension| extension.to_str())
-                    .map_or(true, |extension| !extension.eq_ignore_ascii_case("exe"))
+            if !path.is_file() {
+                return Err("Choose the installed Codex executable.".to_string());
+            }
+            #[cfg(windows)]
+            if path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map_or(true, |extension| !extension.eq_ignore_ascii_case("exe"))
             {
-                return Err("Choose the installed codex.exe file.".to_string());
+                return Err("Choose the installed Codex executable.".to_string());
             }
             codex_version(path).await?;
         }
@@ -435,7 +438,7 @@ impl AppRuntime {
         } else {
             manager.disable()
         }
-        .map_err(|error| format!("Could not update Windows startup: {error}"))?;
+        .map_err(|error| format!("Could not update startup: {error}"))?;
         if let Some(item) = self
             .tray_autostart
             .lock()
@@ -550,22 +553,23 @@ impl AppRuntime {
         }
 
         #[cfg(windows)]
-        {
-            candidates.extend(windows_codex_candidates().await);
+        candidates.extend(windows_codex_candidates().await);
 
-            for candidate in candidates {
-                if candidate.is_file() && codex_version(&candidate).await.is_ok() {
-                    return Some(candidate);
-                }
+        #[cfg(unix)]
+        candidates.extend(unix_codex_candidates());
+
+        #[cfg(not(any(windows, unix)))]
+        push_unique_path(&mut candidates, PathBuf::from("codex"));
+
+        for candidate in candidates {
+            if (candidate.is_file() || candidate == Path::new("codex"))
+                && codex_version(&candidate).await.is_ok()
+            {
+                return Some(candidate);
             }
-
-            None
         }
 
-        #[cfg(not(windows))]
-        {
-            Some(PathBuf::from("codex"))
-        }
+        None
     }
 
     async fn connection_failure(&self, error: &str) {
@@ -657,13 +661,65 @@ fn checkpoint_message(
 }
 
 fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
-    let normalized = path.to_string_lossy().to_ascii_lowercase();
-    if !paths
-        .iter()
-        .any(|existing| existing.to_string_lossy().to_ascii_lowercase() == normalized)
-    {
+    let normalized = path.to_string_lossy();
+    #[cfg(windows)]
+    let normalized = normalized.to_ascii_lowercase();
+    #[cfg(not(windows))]
+    let normalized = normalized.into_owned();
+    if !paths.iter().any(|existing| {
+        let existing = existing.to_string_lossy();
+        #[cfg(windows)]
+        let existing = existing.to_ascii_lowercase();
+        #[cfg(not(windows))]
+        let existing = existing.into_owned();
+        existing == normalized
+    }) {
         paths.push(path);
     }
+}
+
+#[cfg(unix)]
+fn unix_codex_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(path) = std::env::var_os("PATH") {
+        for directory in std::env::split_paths(&path) {
+            push_unique_path(&mut candidates, directory.join("codex"));
+        }
+    }
+
+    for path in [
+        "/usr/local/bin/codex",
+        "/usr/bin/codex",
+        "/opt/homebrew/bin/codex",
+        "/opt/local/bin/codex",
+    ] {
+        push_unique_path(&mut candidates, PathBuf::from(path));
+    }
+
+    if let Some(home) = std::env::var_os("HOME") {
+        let home = PathBuf::from(home);
+        for path in [
+            home.join(".local/bin/codex"),
+            home.join(".cargo/bin/codex"),
+            home.join(".npm-global/bin/codex"),
+        ] {
+            push_unique_path(&mut candidates, path);
+        }
+
+        for root in [
+            home.join(".vscode/extensions"),
+            home.join(".vscode-insiders/extensions"),
+            home.join(".cursor/extensions"),
+            home.join(".nvm/versions/node"),
+        ] {
+            for path in find_codex_executables(&root, 4) {
+                push_unique_path(&mut candidates, path);
+            }
+        }
+    }
+
+    candidates
 }
 
 #[cfg(windows)]
@@ -754,7 +810,6 @@ fn windows_codex_search_roots() -> Vec<PathBuf> {
     roots
 }
 
-#[cfg(windows)]
 fn find_codex_executables(root: &Path, max_depth: usize) -> Vec<PathBuf> {
     fn visit(directory: &Path, depth: usize, max_depth: usize, results: &mut Vec<PathBuf>) {
         let Ok(entries) = fs::read_dir(directory) else {
@@ -766,12 +821,7 @@ fn find_codex_executables(root: &Path, max_depth: usize) -> Vec<PathBuf> {
             let Ok(file_type) = entry.file_type() else {
                 continue;
             };
-            if file_type.is_file()
-                && path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.eq_ignore_ascii_case("codex.exe"))
-            {
+            if path.is_file() && is_codex_executable(&path) {
                 results.push(path);
             } else if file_type.is_dir() && depth < max_depth {
                 visit(&path, depth + 1, max_depth, results);
@@ -788,13 +838,19 @@ fn find_codex_executables(root: &Path, max_depth: usize) -> Vec<PathBuf> {
     results
 }
 
-#[cfg(windows)]
 fn is_codex_executable(path: &Path) -> bool {
+    let expected_name = if cfg!(windows) { "codex.exe" } else { "codex" };
     path.is_file()
         && path
             .file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case("codex.exe"))
+            .is_some_and(|name| {
+                if cfg!(windows) {
+                    name.eq_ignore_ascii_case(expected_name)
+                } else {
+                    name == expected_name
+                }
+            })
 }
 
 fn mark_snapshot_stale(state: &mut AppStateDto) {
@@ -846,8 +902,8 @@ async fn codex_version(executable: &Path) -> Result<String, String> {
     }
     let output = timeout(Duration::from_secs(10), Command::from(process).output())
         .await
-        .map_err(|_| "Timed out while checking codex.exe".to_string())?
-        .map_err(|error| format!("Could not run codex.exe: {error}"))?;
+        .map_err(|_| "Timed out while checking the Codex executable".to_string())?
+        .map_err(|error| format!("Could not run the Codex executable: {error}"))?;
     if !output.status.success() {
         return Err("The selected file is not a working Codex CLI executable.".to_string());
     }
@@ -957,12 +1013,22 @@ mod tests {
         assert!(public.chars().count() <= 240);
     }
 
+    #[cfg(windows)]
     #[test]
     fn unique_paths_are_case_insensitive() {
         let mut paths = Vec::new();
         push_unique_path(&mut paths, PathBuf::from(r"C:\Users\Test\codex.exe"));
         push_unique_path(&mut paths, PathBuf::from(r"c:\users\test\CODEX.EXE"));
         assert_eq!(paths.len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unique_paths_preserve_case_on_unix() {
+        let mut paths = Vec::new();
+        push_unique_path(&mut paths, PathBuf::from("/opt/Codex/codex"));
+        push_unique_path(&mut paths, PathBuf::from("/opt/codex/codex"));
+        assert_eq!(paths.len(), 2);
     }
 
     #[test]

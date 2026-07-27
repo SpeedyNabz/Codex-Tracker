@@ -13,6 +13,8 @@
     "test:watch": "vitest",
     "tauri": "tauri",
     "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-executable.ps1",
+    "build:macos": "node scripts/build-desktop-release.mjs macos",
+    "build:linux": "node scripts/build-desktop-release.mjs linux",
     "protocol:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-codex-protocol.ps1",
     "test:live-codex": "node scripts/live-codex-smoke.mjs"
   },

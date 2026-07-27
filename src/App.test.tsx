@@ -155,7 +155,7 @@ describe("Overlay", () => {
     expect(screen.getByText(formatTokens("415000"))).toBeInTheDocument();
     expect(screen.getByText(formatTokens("9007199254740993"))).toBeInTheDocument();
     expect(screen.getByText("12.50 credits")).toBeInTheDocument();
-    const startup = screen.getByRole("checkbox", { name: /start with windows/i });
+    const startup = screen.getByRole("checkbox", { name: /start at login/i });
     expect(startup).toBeChecked();
     fireEvent.click(startup);
     expect(handlers.onAutostart).toHaveBeenCalledWith(false);
@@ -204,11 +204,11 @@ describe("Overlay", () => {
     const missing = readyState({
       status: "needsCodex",
       snapshot: null,
-      message: "Install Codex or choose codex.exe.",
+      message: "Install Codex or choose the Codex executable.",
     });
     const missingHandlers = props(missing);
     const { rerender } = render(<Overlay {...missingHandlers} />);
-    fireEvent.click(screen.getByRole("button", { name: "Choose codex.exe" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Codex executable" }));
     expect(missingHandlers.onChooseCodex).toHaveBeenCalledOnce();
 
     const auth = readyState({
