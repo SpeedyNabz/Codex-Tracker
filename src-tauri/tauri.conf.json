@@ -41,7 +41,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "publisher": "HeavyMask",
+    "publisher": "Heavymask",
     "homepage": "https://heavymask.com",
     "copyright": "Made by HeavyMask · https://heavymask.com",
     "category": "Utility",
