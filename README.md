@@ -182,7 +182,8 @@ not code-signed or notarized.
 The `Release macOS and Linux` GitHub Actions workflow builds on native runners,
 records SHA-256 checksums, and uploads the DMG, AppImage, and Debian package to
 the existing `heavymask` release. It can also be run manually with a different
-existing release tag.
+existing release tag. If a repository has locked that release as immutable, the
+workflow creates a companion `heavymask-macos-linux` release instead.
 
 ## Project architecture
 
