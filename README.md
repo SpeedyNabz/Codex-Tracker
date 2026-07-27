@@ -177,6 +177,20 @@ The macOS and Linux commands must run on their native operating system. Tauri
 does not create those desktop bundles from Windows. The current packages are
 not signed with a platform developer identity or notarized.
 
+The GitHub macOS release requires an Apple Developer ID Application certificate
+and notarization credentials. Add these repository secrets before rerunning the
+macOS workflow: `APPLE_CERTIFICATE` (base64 `.p12`),
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `KEYCHAIN_PASSWORD`,
+`APPLE_ID`, `APPLE_PASSWORD` (an app-specific password), and `APPLE_TEAM_ID`.
+The workflow refuses to publish an ad-hoc-only DMG.
+
+For the existing DMG, verify its published SHA-256 checksum first. Then open
+the app once, go to **System Settings > Privacy & Security**, and choose
+**Open Anyway**. macOS makes that exception available for about an hour after
+the blocked launch. You can also Control-click the app in Finder and choose
+**Open**. A signed and notarized DMG should be published after the secrets are
+configured.
+
 ### Publish macOS and Linux bundles
 
 The `Release macOS and Linux` GitHub Actions workflow builds on native runners,

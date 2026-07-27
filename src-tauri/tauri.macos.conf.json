@@ -4,6 +4,10 @@
     "targets": [
       "dmg"
     ],
+    "macOS": {
+      "hardenedRuntime": true,
+      "minimumSystemVersion": "10.13"
+    },
     "icon": [
       "icons/icon.icns"
     ]
