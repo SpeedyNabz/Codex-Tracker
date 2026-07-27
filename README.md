@@ -175,7 +175,7 @@ npm run build:linux
 
 The macOS and Linux commands must run on their native operating system. Tauri
 does not create those desktop bundles from Windows. The current packages are
-not code-signed or notarized.
+not signed with a platform developer identity or notarized.
 
 ### Publish macOS and Linux bundles
 
